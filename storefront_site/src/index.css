@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-amazon-canvas text-amazon-text-primary font-sans antialiased min-h-screen selection:bg-amazon-orange selection:text-white;
+  }
+}
+
+.amz-card {
+  @apply bg-amazon-surface border border-amazon-border-card rounded-lg shadow-sm;
+}
+
+.btn-cart {
+  @apply bg-amazon-cta-primary hover:bg-amazon-cta-primaryHover text-[#0F1111] font-normal py-2 px-6 rounded-full transition-colors duration-200 inline-flex items-center justify-center gap-2;
+}
+
+.btn-buy-now {
+  @apply bg-amazon-cta-secondary hover:bg-amazon-cta-secondaryHover text-[#0F1111] font-normal py-2 px-6 rounded-full transition-colors duration-200 inline-flex items-center justify-center gap-2;
+}
+
+.btn-secondary {
+  @apply bg-transparent hover:bg-black/5 border border-amazon-border-card bg-white text-amazon-text-primary font-normal py-2 px-4 rounded-lg transition-colors duration-200 inline-flex items-center justify-center gap-2 shadow-sm;
+}
+
+.deal-badge {
+  @apply bg-amazon-deal-red text-white text-xs font-bold px-2 py-1 rounded-sm uppercase inline-block;
+}
+
+.price-split {
+  @apply inline-flex items-start font-medium text-amazon-text-primary;
+}
+.price-split-symbol {
+  @apply text-[0.65em] mt-[0.2em];
+}
+.price-split-fraction {
+  @apply text-[0.65em] mt-[0.2em];
+}
+
+.amz-link {
+  @apply text-amazon-link-teal hover:text-[#C7511F] hover:underline cursor-pointer;
+}
+
+.btn-primary {
+  @apply btn-cart;
+}
+
+.touch-target {
+  @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+

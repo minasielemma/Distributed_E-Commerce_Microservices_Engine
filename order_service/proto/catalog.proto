@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package catalog;
+
+// Service definition for Catalog Product Service
+service ProductService {
+  // Synchronous gRPC call to retrieve product stock and price
+  rpc GetProduct (ProductRequest) returns (ProductResponse);
+}
+
+message ProductRequest {
+  string id = 1;
+}
+
+message ProductResponse {
+  string id = 1;
+  string title = 2;
+  double price = 3;
+  int32 stock_count = 4;
+  bool found = 5;
+  string error_message = 6;
+}

@@ -1,0 +1,53 @@
+# Python & Django byte-code / caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Environment variables & secrets
+.env
+!.env.example
+*.pem
+shared_keys/
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+.agents
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+CHAT_SERVICE_GUIDELINES.md

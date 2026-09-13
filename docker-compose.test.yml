@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  test_identity:
+    image: micro_service-identity_service:latest
+    environment:
+      DJANGO_SETTINGS_MODULE: identity_project.settings_test
+      SECRET_KEY: test-secret-key
+      KEYS_DIR: /tmp
+    command: python manage.py test authentication --verbosity=2
+    networks:
+      - test_net
+
+  test_payment:
+    image: micro_service-payment_service:latest
+    environment:
+      DJANGO_SETTINGS_MODULE: payment_project.settings_test
+      SECRET_KEY: test-secret-key
+      KEYS_DIR: /tmp
+      KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+    command: python manage.py test payments --verbosity=2
+    networks:
+      - test_net
+
+  test_order:
+    image: micro_service-order_service:latest
+    environment:
+      DJANGO_SETTINGS_MODULE: order_project.settings_test
+      SECRET_KEY: test-secret-key
+      KEYS_DIR: /tmp
+      KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+      REDIS_URL: redis://localhost:6379/0
+    command: python manage.py test orders --verbosity=2
+    networks:
+      - test_net
+
+  test_cart:
+    image: micro_service-cart_service:latest
+    environment:
+      DJANGO_SETTINGS_MODULE: cart_project.settings_test
+      SECRET_KEY: test-secret-key
+      KEYS_DIR: /tmp
+    command: python manage.py test cart --verbosity=2
+    networks:
+      - test_net
+
+  test_catalog:
+    image: micro_service-catalog_service:latest
+    environment:
+      DJANGO_SETTINGS_MODULE: catalog_project.settings_test
+      SECRET_KEY: test-secret-key
+      KEYS_DIR: /tmp
+    command: python manage.py test catalog --verbosity=2
+    networks:
+      - test_net
+
+  test_inventory:
+    image: micro_service-inventory_service:latest
+    environment:
+      DJANGO_SETTINGS_MODULE: inventory_project.settings_test
+      SECRET_KEY: test-secret-key
+      KEYS_DIR: /tmp
+      KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+    command: python manage.py test inventory --verbosity=2
+    networks:
+      - test_net
+
+  test_finance:
+    image: micro_service-finance_service:latest
+    environment:
+      DJANGO_SETTINGS_MODULE: finance_project.settings_test
+      SECRET_KEY: test-secret-key
+      KEYS_DIR: /tmp
+      KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+    command: python manage.py test finance --verbosity=2
+    networks:
+      - test_net
+
+  test_media:
+    image: micro_service-media_service:latest
+    environment:
+      DJANGO_SETTINGS_MODULE: media_project.settings_test
+      SECRET_KEY: test-secret-key
+      KEYS_DIR: /tmp
+    command: python manage.py test media.tests --verbosity=2
+    networks:
+      - test_net
+
+  test_notification:
+    image: micro_service-notification_service:latest
+    environment:
+      DJANGO_SETTINGS_MODULE: notification_project.settings_test
+      SECRET_KEY: test-secret-key
+      KEYS_DIR: /tmp
+      KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+    command: python manage.py test notifications --verbosity=2
+    networks:
+      - test_net
+
+networks:
+  test_net:
+    driver: bridge
+

@@ -1,0 +1,30 @@
+# Git & Documentation
+.git
+.gitignore
+README.md
+LICENSE
+
+# Python / Django Caches
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
+venv
+env
+ENV
+
+# IDEs
+.idea
+.vscode
+*.swp
+*.swo
+
+# Environment & Local Secrets
+.env
+*.pem
+shared_keys
+
+# Logs & temp files
+*.log
+.DS_Store

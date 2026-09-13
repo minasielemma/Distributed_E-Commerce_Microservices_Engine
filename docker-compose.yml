@@ -1,0 +1,643 @@
+version: '3.8'
+
+volumes:
+  shared_keys:
+  identity_db_data:
+  catalog_db_data:
+  order_db_data:
+  payment_db_data:
+  inventory_db_data:
+  finance_db_data:
+  cart_db_data:
+  media_db_data:
+  chat_db_data:
+  recommendation_db_data:
+  notification_db_data:
+  neo4j_data:
+
+
+networks:
+  microservices_net:
+    driver: bridge
+
+services:
+  # ==========================================
+  # 1. ISOLATED DATABASES
+  # ==========================================
+  identity_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: identity_db
+      POSTGRES_USER: identity_user
+      POSTGRES_PASSWORD: identity_pass
+    volumes:
+      - identity_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U identity_user -d identity_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  catalog_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: catalog_db
+      POSTGRES_USER: catalog_user
+      POSTGRES_PASSWORD: catalog_pass
+    volumes:
+      - catalog_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalog_user -d catalog_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  order_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: order_user
+      POSTGRES_PASSWORD: order_pass
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U order_user -d order_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  payment_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: payment_user
+      POSTGRES_PASSWORD: payment_pass
+    volumes:
+      - payment_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment_user -d payment_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  inventory_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_USER: inventory_user
+      POSTGRES_PASSWORD: inventory_pass
+    volumes:
+      - inventory_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory_user -d inventory_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  finance_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: finance_db
+      POSTGRES_USER: finance_user
+      POSTGRES_PASSWORD: finance_pass
+    volumes:
+      - finance_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance_user -d finance_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  cart_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: cart_db
+      POSTGRES_USER: cart_user
+      POSTGRES_PASSWORD: cart_pass
+    volumes:
+      - cart_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cart_user -d cart_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  media_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: media_db
+      POSTGRES_USER: media_user
+      POSTGRES_PASSWORD: media_pass
+    volumes:
+      - media_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U media_user -d media_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  chat_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: chat_db
+      POSTGRES_USER: chat_user
+      POSTGRES_PASSWORD: chat_pass
+    volumes:
+      - chat_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chat_user -d chat_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  recommendation_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: recommendation_db
+      POSTGRES_USER: recommendation_user
+      POSTGRES_PASSWORD: recommendation_pass
+    volumes:
+      - recommendation_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recommendation_user -d recommendation_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  notification_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: notification_user
+      POSTGRES_PASSWORD: notification_pass
+    volumes:
+      - notification_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification_user -d notification_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  neo4j:
+    image: neo4j:5.20.0-community
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/recommendation_pass
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "recommendation_pass", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+
+  # ==========================================
+  # 2. MESSAGE BROKER & REDIS
+  # ==========================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - microservices_net
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 2181 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_ZOOKEEPER_SESSION_TIMEOUT_MS: 6000
+      KAFKA_ZOOKEEPER_CONNECTION_TIMEOUT_MS: 6000
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - microservices_net
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - microservices_net
+
+  # ==========================================
+  # 3. MICROSERVICES
+  # ==========================================
+  identity_service:
+    build:
+      context: ./identity_service
+    env_file:
+      - ./identity_service/.env
+    volumes:
+      - ./identity_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      identity_db:
+        condition: service_healthy
+    networks:
+      - microservices_net
+
+  catalog_service:
+    build:
+      context: ./catalog_service
+    env_file:
+      - ./catalog_service/.env
+    volumes:
+      - ./catalog_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      catalog_db:
+        condition: service_healthy
+      identity_service:
+        condition: service_started
+    networks:
+      - microservices_net
+
+  order_service:
+    build:
+      context: ./order_service
+    env_file:
+      - ./order_service/.env
+    environment:
+      SERVICE_TYPE: web
+    volumes:
+      - ./order_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      order_db:
+        condition: service_healthy
+      catalog_service:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - microservices_net
+
+  order_service_worker:
+    build:
+      context: ./order_service
+    env_file:
+      - ./order_service/.env
+    environment:
+      SERVICE_TYPE: celery_worker
+    volumes:
+      - ./order_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      order_service:
+        condition: service_started
+    networks:
+      - microservices_net
+
+  order_service_beat:
+    build:
+      context: ./order_service
+    env_file:
+      - ./order_service/.env
+    environment:
+      SERVICE_TYPE: celery_beat
+    volumes:
+      - ./order_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      order_service:
+        condition: service_started
+    networks:
+      - microservices_net
+
+  order_service_kafka_consumer:
+    build:
+      context: ./order_service
+    env_file:
+      - ./order_service/.env
+    environment:
+      SERVICE_TYPE: kafka_consumer
+    volumes:
+      - ./order_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      order_service:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+    networks:
+      - microservices_net
+
+  payment_service:
+    build:
+      context: ./payment_service
+    image: micro_service-payment_service
+    env_file:
+      - ./payment_service/.env
+    volumes:
+      - ./payment_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      payment_db:
+        condition: service_healthy
+      identity_service:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+    networks:
+      - microservices_net
+
+  payment_service_kafka_consumer:
+    image: micro_service-payment_service
+    env_file:
+      - ./payment_service/.env
+    environment:
+      SERVICE_TYPE: kafka_consumer
+    volumes:
+      - ./payment_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      payment_service:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+    networks:
+      - microservices_net
+
+
+
+  inventory_service:
+    build:
+      context: ./inventory_service
+    env_file:
+      - ./inventory_service/.env
+    volumes:
+      - ./inventory_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      inventory_db:
+        condition: service_healthy
+      identity_service:
+        condition: service_started
+    networks:
+      - microservices_net
+
+  finance_service:
+    build:
+      context: ./finance_service
+    env_file:
+      - ./finance_service/.env
+    volumes:
+      - ./finance_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      finance_db:
+        condition: service_healthy
+      identity_service:
+        condition: service_started
+    networks:
+      - microservices_net
+
+  finance_service_kafka_consumer:
+    build:
+      context: ./finance_service
+    env_file:
+      - ./finance_service/.env
+    environment:
+      SERVICE_TYPE: kafka_consumer
+    volumes:
+      - ./finance_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      finance_service:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+    networks:
+      - microservices_net
+
+  cart_service:
+    build:
+      context: ./cart_service
+    env_file:
+      - ./cart_service/.env
+    volumes:
+      - ./cart_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      cart_db:
+        condition: service_healthy
+      identity_service:
+        condition: service_started
+    networks:
+      - microservices_net
+
+  media_service:
+    build:
+      context: ./media_service
+      network: host
+    env_file:
+      - ./media_service/.env
+    volumes:
+      - ./media_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      media_db:
+        condition: service_healthy
+      identity_service:
+        condition: service_started
+    networks:
+      - microservices_net
+
+  chat_service:
+    build:
+      context: ./chat_service
+      network: host
+    env_file:
+      - ./chat_service/.env
+    volumes:
+      - ./chat_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      chat_db:
+        condition: service_healthy
+      identity_service:
+        condition: service_started
+      media_service:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - microservices_net
+
+  recommendation_service:
+    build:
+      context: ./recommendation_service
+    env_file:
+      - ./recommendation_service/.env
+    volumes:
+      - ./recommendation_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      recommendation_db:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      identity_service:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+    networks:
+      - microservices_net
+
+  recommendation_service_kafka_consumer:
+    build:
+      context: ./recommendation_service
+    environment:
+      - SERVICE_TYPE=kafka_consumer
+    env_file:
+      - ./recommendation_service/.env
+    volumes:
+      - ./recommendation_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      recommendation_db:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - microservices_net
+
+  notification_service:
+    build:
+      context: ./notification_service
+    env_file:
+      - ./notification_service/.env
+    volumes:
+      - ./notification_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      notification_db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+    networks:
+      - microservices_net
+
+  notification_service_kafka_consumer:
+    build:
+      context: ./notification_service
+    environment:
+      - SERVICE_TYPE=kafka_consumer
+    env_file:
+      - ./notification_service/.env
+    volumes:
+      - ./notification_service:/app
+      - shared_keys:/shared_keys
+    depends_on:
+      notification_db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+    networks:
+      - microservices_net
+
+  admin_portal:
+    build:
+      context: ./admin_portal
+      network: host
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./admin_portal/dist:/usr/share/nginx/html
+      - ./admin_portal/nginx.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - microservices_net
+
+  storefront_site:
+    build:
+      context: ./storefront_site
+      network: host
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./storefront_site/dist:/usr/share/nginx/html
+      - ./storefront_site/nginx.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - microservices_net
+
+  # ==========================================
+  # 4. API GATEWAY
+  # ==========================================
+  gateway:
+    build:
+      context: ./gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - identity_service
+      - catalog_service
+      - order_service
+      - payment_service
+      - inventory_service
+      - finance_service
+      - cart_service
+      - media_service
+      - chat_service
+      - recommendation_service
+      - notification_service
+      - admin_portal
+      - storefront_site
+    networks:
+      - microservices_net
+
+
