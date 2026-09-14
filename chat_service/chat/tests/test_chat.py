@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import patch
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
@@ -184,8 +185,6 @@ class ChatRoomParticipantRemovalTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
-from unittest.mock import patch
-
 class AutoAddParticipantsTests(TestCase):
     def setUp(self):
         self.creator_id = uuid.uuid4()
@@ -321,6 +320,3 @@ class ChatRoomMessageIsolationTests(TestCase):
         group_names = [call[0][0] for call in mock_layer.group_send.call_args_list]
         self.assertIn(f"user_updates_{u1}", group_names)
         self.assertIn(f"user_updates_{u2}", group_names)
-
-
-

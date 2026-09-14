@@ -4,6 +4,7 @@ django.setup()
 from django.contrib.auth import get_user_model
 User = get_user_model()
 u = User.objects.first()
-from rest_framework_simplejwt.tokens import RefreshToken
-token = RefreshToken.for_user(u)
-print(str(token.access_token))
+if u:
+    from rest_framework_simplejwt.tokens import RefreshToken
+    token = RefreshToken.for_user(u)
+    print(str(token.access_token))

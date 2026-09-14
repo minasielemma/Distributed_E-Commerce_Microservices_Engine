@@ -351,5 +351,3 @@ class OrderSagaTests(TestCase):
         self.assertEqual(self.order.status, 'FAILED')
         self.assertTrue(OutboxEvent.objects.filter(event_type='inventory.release').exists())
         self.assertTrue(ProcessedEvent.objects.filter(event_id=self.event_id).exists())
-
-

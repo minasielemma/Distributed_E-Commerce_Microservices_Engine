@@ -282,4 +282,3 @@ class ProductReviewAndCouponTests(TestCase):
         self.assertEqual(code_obj.value, Decimal('10.00'))
         self.assertEqual(code_obj.min_purchase_amount, Decimal('30.00'))
         self.assertEqual(code_obj.usage_limit, 200)
-

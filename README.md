@@ -230,24 +230,24 @@ docker compose exec -T order_service python manage.py test orders --noinput
 docker compose exec -T payment_service python manage.py test payments --noinput
 docker compose exec -T finance_service python manage.py test finance --noinput
 docker compose exec -T notification_service python manage.py test notifications --noinput
-docker compose exec -T media_service python manage.py test media.tests --noinput
-docker compose exec -T chat_service python manage.py test chat.tests --noinput
+docker compose exec -T media_service python manage.py test media --noinput
+docker compose exec -T chat_service python manage.py test chat --noinput
 docker compose exec -T recommendation_service python manage.py test recommendations --noinput
 ```
 
 ### Run Resilience & Race Condition Tests
 
-Dedicated test modules (`tests_resilience.py`) test multithreaded concurrency, database rollbacks, and service outages:
+Dedicated test modules (`tests/test_resilience.py`) test multithreaded concurrency, database rollbacks, and service outages:
 
 ```bash
 # Inventory Service: Multi-threaded stock reservation & row locking
-docker compose exec -T inventory_service python manage.py test inventory.tests_resilience --noinput
+docker compose exec -T inventory_service python manage.py test inventory.tests.test_resilience --noinput
 
 # Order Service: Downstream outage, gRPC fallback & Saga compensating events
-docker compose exec -T order_service python manage.py test orders.tests_resilience --noinput
+docker compose exec -T order_service python manage.py test orders.tests.test_resilience --noinput
 
 # Payment Service: Concurrent checkout idempotency & provider failure fallback
-docker compose exec -T payment_service python manage.py test payments.tests_resilience --noinput
+docker compose exec -T payment_service python manage.py test payments.tests.test_resilience --noinput
 ```
 
 ### Frontend Testing

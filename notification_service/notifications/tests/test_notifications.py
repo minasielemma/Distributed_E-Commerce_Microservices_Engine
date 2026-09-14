@@ -1,8 +1,9 @@
+import uuid
 from django.test import TestCase
 from rest_framework.test import APIClient
 from notifications.models import Notification
 from notifications.kafka_consumer import process_notification_message
-import uuid
+
 
 class NotificationModelTests(TestCase):
     def test_create_notification(self):
@@ -17,6 +18,7 @@ class NotificationModelTests(TestCase):
         self.assertEqual(notif.user_id, "123")
         self.assertFalse(notif.is_read)
         self.assertEqual(notif.notification_type, "ORDER")
+
 
 class NotificationKafkaConsumerTests(TestCase):
     def test_process_notification_message(self):
@@ -36,6 +38,7 @@ class NotificationKafkaConsumerTests(TestCase):
         self.assertEqual(notif.user_id, "456")
         self.assertEqual(notif.title, "Order Shipped")
         self.assertEqual(notif.message, "Order #1001 is on the way")
+
 
 class NotificationAPITests(TestCase):
     def setUp(self):

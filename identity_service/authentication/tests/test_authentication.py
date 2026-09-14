@@ -4,7 +4,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 
-from .models import User, Tenant, Subscription, UserProfile, ActivityLog, UserAddress, Notification
+from authentication.models import User, Tenant, Subscription, UserProfile, ActivityLog, UserAddress, Notification
 
 
 class RegisterViewTests(TestCase):
@@ -42,11 +42,10 @@ class RegisterViewTests(TestCase):
 
     def test_token_contains_role_claims(self):
         user = User.objects.create_user(username='adminusr', email='adminusr@example.com', password='pass123', is_staff=True, role='PLATFORM_ADMIN')
-        from .serializers import CustomTokenObtainPairSerializer
+        from authentication.serializers import CustomTokenObtainPairSerializer
         token = CustomTokenObtainPairSerializer.get_token(user)
         self.assertEqual(token['role'], 'PLATFORM_ADMIN')
         self.assertTrue(token['is_platform_admin'])
-
 
 
 class TenantViewTests(TestCase):
@@ -184,7 +183,7 @@ class MultiTenantRBACSecurityTests(TestCase):
         self.owner = User.objects.create_user(username='shopowner', email='owner@shopa.com', password='pass123', role='STORE_OWNER')
         self.tenant = Tenant.objects.create(name='Shop A', domain='shopa.com', owner=self.owner)
         self.staff_user = User.objects.create_user(username='productmgr', email='pm@shopa.com', password='pass123', role='CUSTOMER')
-        from .models import TenantMembership
+        from authentication.models import TenantMembership
         self.membership = TenantMembership.objects.create(
             user=self.staff_user,
             tenant=self.tenant,
@@ -199,7 +198,7 @@ class MultiTenantRBACSecurityTests(TestCase):
         self.assertNotIn('finance.manage', perms)
 
     def test_token_contains_tenant_membership_claims(self):
-        from .serializers import CustomTokenObtainPairSerializer
+        from authentication.serializers import CustomTokenObtainPairSerializer
         token = CustomTokenObtainPairSerializer.get_token(self.staff_user)
         self.assertEqual(token['tenant_id'], str(self.tenant.id))
         self.assertEqual(len(token['memberships']), 1)
@@ -220,4 +219,3 @@ class MultiTenantRBACSecurityTests(TestCase):
         log_ids = [str(item['id']) for item in results]
         self.assertIn(str(log_a.id), log_ids)
         self.assertNotIn(str(log_b.id), log_ids)
-

@@ -147,4 +147,3 @@ class ItemRequestViewSetTests(TestCase):
         self.client.force_authenticate(user=None)
         response = self.client.get('/api/cart/item-requests/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-

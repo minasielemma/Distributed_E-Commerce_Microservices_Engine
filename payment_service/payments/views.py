@@ -145,7 +145,9 @@ class CreateCheckoutSessionView (APIView ):
                     timeout =5 
                     )
                 except Exception as ord_err :
-                    logger .warning (f"Could not update order status directly: {ord_err }")
+                    logger.exception(
+                        "Could not mark order %s as paid",order_id,exc_info =ord_err)
+                    raise Exception("Could not update order status") from ord_err
 
                 return Response ({
                 'message':'Payment completed successfully (Local Payment)',
@@ -239,6 +241,7 @@ class ConfirmPaymentSessionView (APIView ):
                 )
             except Exception as e :
                 logger .warning (f"Failed to notify order service of paid status: {e }")
+                raise Exception("Could not update order status") from e
 
 
         if payment .discount_code :
@@ -252,6 +255,7 @@ class ConfirmPaymentSessionView (APIView ):
                 )
             except Exception as coupon_err :
                 logger .warning (f"Could not confirm coupon for order {order_id }: {coupon_err }")
+                raise Exception("Could not confirm coupon for order") from coupon_err
 
         return Response ({
         'message':f'Payment for order {order_id } confirmed and marked as PAID',
@@ -346,6 +350,7 @@ class PolarWebhookView (APIView ):
                     logger .info (f"Published payment.succeeded event for order {payment .order_id } to Kafka")
                 except Exception as k_err :
                     logger .error (f"Failed to publish Kafka event for order {payment .order_id }: {k_err }")
+                    raise Exception("Could not publish payment event to Kafka") from k_err
 
                 try :
                     from .utils import make_service_token 
@@ -362,6 +367,7 @@ class PolarWebhookView (APIView ):
                     )
                 except Exception as ord_err :
                     logger .warning (f"Could not update order status directly in webhook: {ord_err }")
+                    raise Exception("Could not update order status directly in webhook:") from ord_err
 
 
             if payment .discount_code :
@@ -375,6 +381,7 @@ class PolarWebhookView (APIView ):
                     )
                 except Exception as coupon_err :
                     logger .warning (f"Could not confirm coupon for order {payment .order_id }: {coupon_err }")
+                    raise Exception("Could not confirm coupon for order") from coupon_err
 
             return Response ({
             'status':'PAID',

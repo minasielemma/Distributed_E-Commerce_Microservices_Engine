@@ -4,9 +4,9 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
-from .models import UserInteraction, ProductMetadataCache, CachedRecommendation
-from .graph_sync import sync_event_to_graph
-from .engine import (
+from recommendations.models import UserInteraction, ProductMetadataCache, CachedRecommendation
+from recommendations.graph_sync import sync_event_to_graph
+from recommendations.engine import (
     get_personalized_recommendations,
     get_copurchase_recommendations,
     get_similar_product_recommendations,

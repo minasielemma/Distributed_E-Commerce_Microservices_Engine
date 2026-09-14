@@ -130,7 +130,6 @@ class MediaServiceTests(TestCase):
         self.client.force_authenticate(user=self.user2)
         self.assertEqual(self.client.get(f'/api/media/files/{file_id}/').status_code, status.HTTP_200_OK)
 
-
     def test_delete_file_by_non_owner_fails(self):
         self.client.force_authenticate(user=self.user1)
         image_data = SimpleUploadedFile("doc.pdf", b"pdf_content", content_type="application/pdf")
@@ -140,4 +139,3 @@ class MediaServiceTests(TestCase):
         self.client.force_authenticate(user=self.user2)
         del_resp = self.client.delete(f'/api/media/files/{file_id}/')
         self.assertEqual(del_resp.status_code, status.HTTP_403_FORBIDDEN)
-
