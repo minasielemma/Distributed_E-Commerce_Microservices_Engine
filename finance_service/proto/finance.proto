@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package finance;
+
+service FinanceService {
+  rpc RecordLedgerPayment (RecordPaymentRequest) returns (RecordPaymentResponse);
+}
+
+message RecordPaymentRequest {
+  string tenant_id = 1;
+  string order_id = 2;
+  string payment_id = 3;
+  double amount = 4;
+  string currency = 5;
+  string payment_method = 6;
+}
+
+message RecordPaymentResponse {
+  bool success = 1;
+  string entry_id = 2;
+  string error_message = 3;
+}

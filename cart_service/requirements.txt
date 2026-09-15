@@ -6,3 +6,6 @@ psycopg2-binary>=2.9.9
 gunicorn>=21.2.0
 kafka-python-ng>=2.2.2
 drf-yasg>=1.21.7
+
+grpcio>=1.60.0
+grpcio-tools>=1.60.0

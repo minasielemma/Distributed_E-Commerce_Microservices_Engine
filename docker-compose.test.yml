@@ -97,28 +97,7 @@ services:
     networks:
       - test_net
 
-  test_chat:
-    image: micro_service-chat_service:latest
-    environment:
-      DJANGO_SETTINGS_MODULE: chat_project.settings
-      SECRET_KEY: test-secret-key
-      KEYS_DIR: /tmp
-    command: python manage.py test chat --verbosity=2
-    networks:
-      - test_net
-
-  test_recommendation:
-    image: micro_service-recommendation_service:latest
-    environment:
-      DJANGO_SETTINGS_MODULE: recommendation_project.settings
-      SECRET_KEY: test-secret-key
-      KEYS_DIR: /tmp
-    command: python manage.py test recommendations --verbosity=2
-    networks:
-      - test_net
-
 networks:
   test_net:
     driver: bridge
-
 

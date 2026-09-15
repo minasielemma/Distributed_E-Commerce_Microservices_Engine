@@ -12,3 +12,6 @@ gunicorn>=21.2.0
 drf-yasg>=1.21.7
 neo4j>=5.14.0
 daphne>=4.0.0
+
+grpcio>=1.60.0
+grpcio-tools>=1.60.0

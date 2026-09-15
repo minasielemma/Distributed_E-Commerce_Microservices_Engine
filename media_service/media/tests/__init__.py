@@ -1,1 +1,1 @@
-# Package marker for media app tests
+# Media Service Tests Package

@@ -99,10 +99,10 @@ class CartViewSet(FullBaseViewSet):
 
         if owned_tenant_ids and product_id:
             try:
-                import requests
-                cat_res = requests.get(f"http://catalog_service:8000/api/catalog/storefront/products/{product_id}/", timeout=3)
-                if cat_res.status_code == 200:
-                    prod_tenant = str(cat_res.json().get('tenant_id', '') or '')
+                from cart.grpc_client import get_catalog_product
+                prod_resp = get_catalog_product(product_id)
+                if prod_resp and prod_resp.found:
+                    prod_tenant = str(prod_resp.tenant_id or '')
                     if prod_tenant and prod_tenant in owned_tenant_ids:
                         return Response(
                             {'error': 'Self-purchase prohibited: You cannot purchase products from a shop you own or manage.'},
@@ -181,16 +181,10 @@ class CartViewSet(FullBaseViewSet):
         discount_value = 10.0 if code.upper() == 'SAVE10' else 0.0
 
         try:
-            catalog_host = os.getenv('CATALOG_SERVICE_HOST', 'catalog_service')
-            url = f"http://{catalog_host}:8000/api/catalog/coupons/validate/"
-            payload = json.dumps({'code': code}).encode('utf-8')
-            req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
-            with urllib.request.urlopen(req, timeout=2) as resp:
-                if resp.status == 200:
-                    res_data = json.loads(resp.read().decode())
-                    if res_data.get('valid'):
-                        discount_type = res_data.get('discount_type', 'PERCENTAGE')
-                        discount_value = float(res_data.get('value', 0))
+            from cart.grpc_client import validate_coupon_grpc
+            c_resp = validate_coupon_grpc(code)
+            if c_resp and c_resp.is_valid:
+                discount_value = float(c_resp.discount_amount)
         except Exception:
             pass
 
@@ -329,17 +323,12 @@ class ItemRequestViewSet(FullBaseViewSet):
         item_req = serializer.save(user_id=user_id, tenant_id=tenant_id)
 
         if tenant_id:
-            import os
-            identity_host = os.getenv('IDENTITY_SERVICE_HOST', 'identity_service')
-            send_internal_http_post(
-                f"http://{identity_host}:8000/api/auth/notifications/create-internal/",
-                {
-                    'tenant_id': str(tenant_id),
-                    'title': f"New Special Product Request: {item_req.product_name}",
-                    'message': f"A customer submitted a product request: '{item_req.product_name}' (Qty: {item_req.quantity}).",
-                    'notification_type': 'ITEM_REQUEST',
-                    'metadata': {'item_request_id': str(item_req.id), 'tenant_id': str(tenant_id)}
-                }
+            from cart.grpc_client import send_notification_grpc
+            send_notification_grpc(
+                tenant_id=str(tenant_id),
+                title=f"New Special Product Request: {item_req.product_name}",
+                message=f"A customer submitted a product request: '{item_req.product_name}' (Qty: {item_req.quantity}).",
+                notification_type='ITEM_REQUEST'
             )
 
     @action(detail=True, methods=['post', 'patch'], url_path='update-status')
@@ -357,17 +346,12 @@ class ItemRequestViewSet(FullBaseViewSet):
         serializer = ItemRequestStatusUpdateSerializer(item_request, data=request.data, partial=True)
         if serializer.is_valid():
             updated = serializer.save()
-            import os
-            identity_host = os.getenv('IDENTITY_SERVICE_HOST', 'identity_service')
-            send_internal_http_post(
-                f"http://{identity_host}:8000/api/auth/notifications/create-internal/",
-                {
-                    'user_id': str(updated.user_id),
-                    'title': f"Item Request Update: {updated.product_name}",
-                    'message': f"Your product request status was updated to {updated.status}." + (f" Note: {updated.admin_response}" if updated.admin_response else ""),
-                    'notification_type': 'ITEM_REQUEST',
-                    'metadata': {'item_request_id': str(updated.id), 'status': updated.status}
-                }
+            from cart.grpc_client import send_notification_grpc
+            send_notification_grpc(
+                recipient_id=str(updated.user_id),
+                title=f"Item Request Update: {updated.product_name}",
+                message=f"Your product request status was updated to {updated.status}." + (f" Note: {updated.admin_response}" if updated.admin_response else ""),
+                notification_type='ITEM_REQUEST'
             )
 
             return Response(ItemRequestSerializer(updated).data, status=status.HTTP_200_OK)

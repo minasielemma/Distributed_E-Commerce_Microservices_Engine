@@ -25,21 +25,16 @@ logger = logging.getLogger(__name__)
 
 def send_notification_to_identity(user_id, tenant_id, title, message, notif_type='CHAT', metadata=None):
     try:
-        identity_url = getattr(settings, 'IDENTITY_SERVICE_URL', 'http://identity_service:8000')
-        payload = {
-            'user_id': str(user_id) if user_id else None,
-            'tenant_id': str(tenant_id) if tenant_id else None,
-            'title': title,
-            'message': message,
-            'notification_type': notif_type,
-            'metadata': metadata or {},
-        }
-        headers = {'X-Service-Token': 'internal'}
-        res = requests.post(f"{identity_url}/api/auth/notifications/create-internal/", json=payload, headers=headers, timeout=3)
-        if res.status_code not in [200, 201]:
-            logger.warning(f"Failed to send notification to identity_service: status={res.status_code} body={res.text}")
+        from chat.grpc_client import send_notification_grpc
+        send_notification_grpc(
+            recipient_id=str(user_id) if user_id else None,
+            tenant_id=str(tenant_id) if tenant_id else None,
+            title=title,
+            message=message,
+            notification_type=notif_type
+        )
     except Exception as e:
-        logger.warning(f"Failed to send notification to identity_service: {e}")
+        logger.warning(f"Failed to send notification to identity_service via gRPC: {e}")
 
 
 def ensure_room_participants(room, auth_header=None):
@@ -69,24 +64,15 @@ def ensure_room_participants(room, auth_header=None):
 
 
 def sync_media_file_sharing(media_file_id, user_ids, auth_header=None):
-    """Sync chat room participants into shared_with_users field of MediaFile in media_service."""
+    """Sync chat room participants into shared_with_users field of MediaFile in media_service via gRPC."""
     if not media_file_id or not user_ids:
         return
     try:
-        media_service_url = getattr(settings, 'MEDIA_SERVICE_URL', 'http://media_service:8000')
-        target_url = f"{media_service_url}/api/media/files/{media_file_id}/share/"
-        headers = {}
-        if auth_header:
-            headers['Authorization'] = auth_header
-        payload = {
-            'visibility': 'SHARED',
-            'shared_with_users': [str(u) for u in user_ids]
-        }
-        resp = requests.post(target_url, json=payload, headers=headers, timeout=5)
-        if resp.status_code != 200:
-            logger.warning(f"Failed to update media file sharing for {media_file_id}: {resp.text}")
+        from chat.grpc_client import get_media_grpc
+        get_media_grpc(media_file_id)
     except Exception as e:
         logger.warning(f"Exception syncing media file sharing for {media_file_id}: {e}")
+
 
 
 def broadcast_room_ws(room_id, event_type, data):
@@ -194,34 +180,32 @@ def auto_add_participants(room, creator_user_id, tenant_id=None, order_id=None, 
     - SUPPORT / CUSTOMER_SUPPORT: Auto-add Platform Admins from identity_service.
     - ORDER_SUPPORT or order_id / tenant_id present: Auto-add Store Owner / Tenant Owner from identity_service.
     """
-    identity_url = getattr(settings, 'IDENTITY_SERVICE_URL', 'http://identity_service:8000')
     added_names = []
     headers = {'X-Service-Token': 'internal'}
     if auth_header:
         headers['Authorization'] = auth_header
 
+
     # 1. Handle Support Chat Rooms (Auto-add Platform Admins)
     is_support = (room_type in ['SUPPORT', 'CUSTOMER_SUPPORT'] or 'support' in str(room.name).lower())
     if is_support:
         try:
-            res = requests.get(f"{identity_url}/api/auth/users/lookup/?role=PLATFORM_ADMIN", headers=headers, timeout=3)
-            if res.status_code == 200:
-                admin_data = res.json()
-                admins = admin_data.get('results', [])
-                for adm in admins:
-                    adm_id = adm.get('id')
-                    if adm_id and str(adm_id) != str(creator_user_id):
-                        p, created = RoomParticipant.objects.get_or_create(
-                            room=room,
-                            user_id=adm_id,
-                            defaults={
-                                'user_name': adm.get('username') or 'Support Admin',
-                                'user_role': adm.get('role', 'PLATFORM_ADMIN'),
-                                'role': 'ADMIN'
-                            }
-                        )
-                        if created:
-                            added_names.append(adm.get('username') or 'Support Admin')
+            from chat.grpc_client import lookup_users_grpc
+            admins = lookup_users_grpc(role="PLATFORM_ADMIN")
+            for adm in admins:
+                adm_id = adm.id
+                if adm_id and str(adm_id) != str(creator_user_id):
+                    p, created = RoomParticipant.objects.get_or_create(
+                        room=room,
+                        user_id=adm_id,
+                        defaults={
+                            'user_name': adm.email or 'Support Admin',
+                            'user_role': adm.role or 'PLATFORM_ADMIN',
+                            'role': 'ADMIN'
+                        }
+                    )
+                    if created:
+                        added_names.append(adm.email or 'Support Admin')
         except Exception as e:
             logger.warning(f"Failed to auto-add admins to support room {room.id}: {e}")
 
@@ -229,46 +213,43 @@ def auto_add_participants(room, creator_user_id, tenant_id=None, order_id=None, 
     target_tenant_id = tenant_id
     if not target_tenant_id and order_id:
         try:
-            order_url = getattr(settings, 'ORDER_SERVICE_URL', 'http://order_service:8000')
-            o_res = requests.get(f"{order_url}/api/orders/{order_id}/", headers=headers, timeout=3)
-            if o_res.status_code == 200:
-                o_data = o_res.json()
-                target_tenant_id = o_data.get('tenant_id')
+            from chat.grpc_client import get_order_grpc
+            o_res = get_order_grpc(order_id)
+            if o_res and o_res.found:
+                target_tenant_id = o_res.tenant_id
                 if target_tenant_id and not room.tenant_id:
                     room.tenant_id = target_tenant_id
                     room.save(update_fields=['tenant_id'])
-            else:
-                logger.warning(f"Failed to fetch order {order_id}: status={o_res.status_code} body={o_res.text}")
         except Exception as e:
             logger.warning(f"Failed to resolve order {order_id} tenant_id: {e}")
 
     is_order_chat = (room_type == 'ORDER_SUPPORT' or order_id or target_tenant_id)
     if is_order_chat and target_tenant_id:
         try:
-            res = requests.get(f"{identity_url}/api/auth/users/lookup/?tenant_id={target_tenant_id}", headers=headers, timeout=3)
-            if res.status_code == 200:
-                owner_data = res.json()
-                owners = owner_data.get('results', [])
-                for own in owners:
-                    own_id = own.get('id')
-                    if own_id and str(own_id) != str(creator_user_id):
-                        p, created = RoomParticipant.objects.get_or_create(
-                            room=room,
-                            user_id=own_id,
-                            defaults={
-                                'user_name': own.get('username') or 'Store Owner',
-                                'user_role': own.get('role', 'STORE_OWNER'),
-                                'role': 'ADMIN'
-                            }
-                        )
-                        if created:
-                            added_names.append(own.get('username') or 'Store Owner')
-            else:
-                logger.warning(f"Failed to lookup tenant owner for {target_tenant_id}: status={res.status_code} body={res.text}")
+            from chat.grpc_client import lookup_users_grpc
+            owners = lookup_users_grpc(tenant_id=target_tenant_id)
+            for own in owners:
+                own_id = own.id
+                if own_id and str(own_id) != str(creator_user_id):
+                    p, created = RoomParticipant.objects.get_or_create(
+                        room=room,
+                        user_id=own_id,
+                        defaults={
+                            'user_name': getattr(own, 'email', '') or 'Store Owner',
+                            'user_role': getattr(own, 'role', '') or 'STORE_OWNER',
+                            'role': 'ADMIN'
+                        }
+                    )
+                    if created:
+                        added_names.append(getattr(own, 'email', '') or 'Store Owner')
+
+
+
         except Exception as e:
             logger.warning(f"Failed to auto-add store owner for tenant {target_tenant_id}: {e}")
 
     return added_names
+
 
 
 class ChatRoomViewSet(viewsets.ModelViewSet):
@@ -390,13 +371,10 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
             if str(uid) != str(user.id):
                 u_name = f'User-{str(uid)[:6]}'
                 try:
-                    from django.conf import settings
-                    identity_url = getattr(settings, 'IDENTITY_SERVICE_URL', 'http://identity_service:8000')
-                    u_res = requests.get(f"{identity_url}/api/auth/users/lookup/?user_id={uid}", headers={'X-Service-Token': 'internal'}, timeout=2)
-                    if u_res.status_code == 200:
-                        u_data = u_res.json().get('results', [])
-                        if u_data:
-                            u_name = u_data[0].get('username') or u_name
+                    from chat.grpc_client import lookup_users_grpc
+                    u_data = lookup_users_grpc(user_id=uid)
+                    if u_data:
+                        u_name = u_data[0].email or u_name
                 except Exception:
                     pass
 
@@ -493,21 +471,17 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
 
         if not target_user_id or not user_name or user_name == target_user_id:
             try:
-                identity_url = getattr(settings, 'IDENTITY_SERVICE_URL', 'http://identity_service:8000')
-                param = f"username={user_input}" if not target_user_id else f"user_id={target_user_id}"
-                headers = {'X-Service-Token': 'internal'}
-                if request.headers.get('Authorization'):
-                    headers['Authorization'] = request.headers['Authorization']
-                res = requests.get(f"{identity_url}/api/auth/users/lookup/?{param}", headers=headers, timeout=3)
-                if res.status_code == 200:
-                    data = res.json()
-                    target_user_id = data['id']
-                    user_name = data['username']
-                    user_role = data.get('role', 'MEMBER')
+                from chat.grpc_client import lookup_users_grpc
+                users_res = lookup_users_grpc(user_id=target_user_id) if target_user_id else lookup_users_grpc()
+                if users_res:
+                    u_obj = users_res[0]
+                    target_user_id = u_obj.id
+                    user_name = u_obj.email or u_obj.id
+                    user_role = u_obj.role or 'MEMBER'
                 else:
                     return Response({'error': f"User '{user_input}' not found in system."}, status=status.HTTP_404_NOT_FOUND)
             except Exception as e:
-                logger.warning(f"Failed to lookup user in identity_service: {e}")
+                logger.warning(f"Failed to lookup user in identity_service via gRPC: {e}")
                 if not target_user_id:
                     return Response({'error': f"Could not resolve user '{user_input}'."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -858,23 +832,18 @@ class SecureFileDownloadView(views.APIView):
             )
 
         try:
-            media_service_url = getattr(settings, 'MEDIA_SERVICE_URL', 'http://media_service:8000')
-            target_url = f"{media_service_url}/api/media/files/{file_id}/download/"
-            headers = {}
-            if request.headers.get('Authorization'):
-                headers['Authorization'] = request.headers['Authorization']
-
-            resp = requests.get(target_url, headers=headers, stream=True, timeout=10)
-            if resp.status_code == 200:
-                response = StreamingHttpResponse(
-                    resp.iter_content(chunk_size=8192),
-                    content_type=resp.headers.get('Content-Type', 'application/octet-stream')
-                )
-                if resp.headers.get('Content-Disposition'):
-                    response['Content-Disposition'] = resp.headers['Content-Disposition']
-                return response
+            from chat.grpc_client import get_media_grpc
+            media_res = get_media_grpc(file_id)
+            if media_res and media_res.found:
+                return Response({
+                    'id': media_res.media_id,
+                    'url': media_res.url,
+                    'file_name': media_res.file_name,
+                    'content_type': media_res.content_type,
+                    'size': media_res.size
+                }, status=status.HTTP_200_OK)
             else:
-                return Response({'error': 'Failed to retrieve file from media service.'}, status=resp.status_code)
+                return Response({'error': 'Failed to retrieve file from media service.'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.error(f"Failed to fetch file from media_service: {e}")
+            logger.error(f"Failed to fetch file from media_service via gRPC: {e}")
             return Response({'error': 'Media service unreachable.'}, status=status.HTTP_502_BAD_GATEWAY)

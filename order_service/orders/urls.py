@@ -9,7 +9,8 @@ from .views import (
     OutboxListView,
     OrderListView,
     OrderDetailView,
-    BroadcastNotificationView
+    BroadcastNotificationView,
+    AvailableCarriersView
 )
 from .shipment_views import (
     OrderShipmentListView,
@@ -21,6 +22,7 @@ from .shipment_views import (
 router = DefaultRouter()
 
 urlpatterns = [
+    path('carriers/', AvailableCarriersView.as_view(), name='available_carriers'),
     path('create/', CreateOrderView.as_view(), name='order_create'),
 
     path('list/', OrderListView.as_view(), name='order_list'),

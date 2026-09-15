@@ -1,1 +1,1 @@
-# Package marker for chat app tests
+# Chat Service Tests Package

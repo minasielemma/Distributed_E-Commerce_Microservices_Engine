@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { orderService } from '../services/apiServices';
 import { getErrorMessage } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { CartContext } from '../context/CartContext';
 import { Modal, LoadingSkeleton, Badge, Pagination } from '../components/common/UIComponents';
 import { ShoppingBag, CreditCard, Clock, Eye, CheckCircle, AlertCircle, FileText, Truck, MessageSquare } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { usePagination } from '../hooks/usePagination';
 
 export default function OrdersPage() {
@@ -16,6 +17,8 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [timeFilter, setTimeFilter] = useState('ALL');
   const { showSuccess, showError } = useToast();
+  const navigate = useNavigate();
+  const { addToCart } = useContext(CartContext);
 
   const pagination = usePagination({ initialPage: 1, initialPageSize: 10 });
 
@@ -63,17 +66,37 @@ export default function OrdersPage() {
     return () => window.removeEventListener('notification_received', handleRealtimeNotification);
   }, []);
 
-  const handlePayOrder = async (orderId) => {
+  const handlePayOrder = async (orderOrId) => {
+    const targetOrder = typeof orderOrId === 'object' ? orderOrId : orders.find((o) => String(o.id) === String(orderOrId));
+    const orderId = targetOrder ? targetOrder.id : orderOrId;
+
     setPayingOrderId(orderId);
     try {
-      const res = await orderService.payOrder(orderId);
-      showSuccess('Checkout session created! Redirecting to payment...');
-      if (res.data?.checkout_url) {
-        window.location.href = res.data.checkout_url;
-      } else {
-        showSuccess('Order payment process initiated.');
-        fetchOrders();
+      if (targetOrder && Array.isArray(targetOrder.items) && targetOrder.items.length > 0) {
+        for (const item of targetOrder.items) {
+          const product = {
+            id: item.product_id,
+            name: item.product_name || `Product #${item.product_id}`,
+            image_url: item.image_url || '',
+            price: item.unit_price || item.price || 0,
+          };
+          await addToCart(
+            product,
+            item.quantity || 1,
+            item.variant_id || null,
+            item.variant_sku || item.variant_name || '',
+            item.unit_price || item.price || 0
+          );
+        }
       }
+
+      await orderService.cancelOrder(orderId).catch((err) => {
+        console.warn('Could not cancel order on backend:', err);
+      });
+
+      showSuccess('Order items added to cart and order removed from pending orders list!');
+      await fetchOrders();
+      navigate('/cart');
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -298,7 +321,7 @@ export default function OrdersPage() {
                       <Link to={`/orders/${order.id}/tracking`} className="btn-secondary py-1.5 w-full text-center text-sm mb-1 shadow-sm font-normal">Track package</Link>
                       
                       {['PENDING', 'UNPAID', 'CREATED'].includes((order.status || '').toUpperCase()) && (
-                        <button onClick={() => handlePayOrder(order.id)} disabled={payingOrderId === order.id} className="btn-buy-now py-1.5 w-full text-sm shadow-sm">
+                        <button onClick={() => handlePayOrder(order)} disabled={payingOrderId === order.id} className="btn-buy-now py-1.5 w-full text-sm shadow-sm">
                           {payingOrderId === order.id ? 'Processing...' : 'Pay Now'}
                         </button>
                       )}

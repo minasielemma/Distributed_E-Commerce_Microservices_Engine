@@ -1,6 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Truck, Calendar, MapPin, ExternalLink, Plus, Edit, Clock, CheckCircle2 } from 'lucide-react';
 import { Badge } from './common/UIComponents';
+import { orderService } from '../services/apiServices';
+
+export const useAvailableCarriers = () => {
+  const [carriers, setCarriers] = useState(['Standard Delivery', 'FedEx', 'UPS', 'USPS', 'DHL']);
+
+  useEffect(() => {
+    let isMounted = true;
+    orderService.getAvailableCarriers()
+      .then(res => {
+        if (!isMounted) return;
+        const names = res?.data?.names || (Array.isArray(res?.data?.carriers) ? res.data.carriers.map(c => c.name) : null);
+        if (names && names.length > 0) {
+          setCarriers(names);
+        }
+      })
+      .catch(err => {
+        console.warn('Failed to load carriers dynamically:', err);
+      });
+    return () => { isMounted = false; };
+  }, []);
+
+  return { carriers };
+};
 
 export const ShipmentCard = ({ shipment, onUpdateStatus }) => {
   if (!shipment) return null;
@@ -21,52 +44,50 @@ export const ShipmentCard = ({ shipment, onUpdateStatus }) => {
                 href={shipment.tracking_url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-cyan-400 hover:underline ml-2 inline-flex items-center gap-1"
+                className="text-cyan-400 hover:text-cyan-300 ml-2 inline-flex items-center gap-1 hover:underline"
               >
-                Track Link <ExternalLink size={10} />
+                Track external <ExternalLink className="w-3 h-3" />
               </a>
             )}
           </div>
         </div>
-
-        {onUpdateStatus && (
-          <button
-            onClick={() => onUpdateStatus(shipment)}
-            className="px-3 py-1.5 rounded-xl bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-600 hover:text-white transition-all text-xs font-semibold inline-flex items-center gap-1.5"
-          >
-            <Edit className="w-3.5 h-3.5" /> Update Status
-          </button>
-        )}
+        <button
+          onClick={() => onUpdateStatus(shipment)}
+          className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors self-start sm:self-auto"
+        >
+          <Edit className="w-3.5 h-3.5 text-cyan-400" />
+          Update Status
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-        <div>
-          <span className="text-slate-400 block font-medium">Recipient</span>
-          <span className="font-bold text-white truncate block">{shipment.full_name}</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <div className="flex items-start gap-2 text-slate-300">
+          <MapPin className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold block text-white">{shipment.full_name}</span>
+            <span>{shipment.address_line_1}{shipment.address_line_2 ? `, ${shipment.address_line_2}` : ''}</span>
+            <span className="block text-slate-400">{shipment.city}, {shipment.postcode}, {shipment.country}</span>
+          </div>
         </div>
-        <div>
-          <span className="text-slate-400 block font-medium">Destination</span>
-          <span className="text-slate-300 truncate block">{shipment.city}, {shipment.country}</span>
-        </div>
-        <div>
-          <span className="text-slate-400 block font-medium">Estimated Delivery</span>
-          <span className="text-slate-200 font-semibold block">
-            {shipment.estimated_delivery_date ? new Date(shipment.estimated_delivery_date).toLocaleDateString() : 'N/A'}
-          </span>
-        </div>
-        <div>
-          <span className="text-slate-400 block font-medium">Dispatched At</span>
-          <span className="text-slate-200 font-semibold block">
-            {shipment.shipped_at ? new Date(shipment.shipped_at).toLocaleDateString() : 'Not dispatched'}
-          </span>
+
+        <div className="space-y-1 text-slate-400">
+          {shipment.estimated_delivery_date && (
+            <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
+              <Calendar className="w-3.5 h-3.5" /> Est. Delivery: {shipment.estimated_delivery_date}
+            </div>
+          )}
+          {shipment.shipped_at && (
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <Clock className="w-3.5 h-3.5" /> Shipped: {new Date(shipment.shipped_at).toLocaleDateString()}
+            </div>
+          )}
+          {shipment.notes && (
+            <p className="italic text-slate-400 text-xs bg-white/5 p-2 rounded-lg border border-white/5 mt-1">
+              "{shipment.notes}"
+            </p>
+          )}
         </div>
       </div>
-
-      {shipment.notes && (
-        <div className="text-xs bg-slate-950 p-2.5 rounded-xl border border-white/5 text-slate-300 italic">
-          "{shipment.notes}"
-        </div>
-      )}
     </div>
   );
 };
@@ -74,8 +95,9 @@ export const ShipmentCard = ({ shipment, onUpdateStatus }) => {
 export const ShipmentFormModal = ({ isOpen, onClose, order, onSubmit, loading }) => {
   if (!isOpen || !order) return null;
 
+  const { carriers: availableCarriers } = useAvailableCarriers();
   const addr = order.shipping_address || {};
-  const [carrier, setCarrier] = useState('FedEx');
+  const [carrier, setCarrier] = useState('Standard Delivery');
   const [trackingCode, setTrackingCode] = useState('');
   const [estDate, setEstDate] = useState('');
   const [fullName, setFullName] = useState(addr.full_name || 'Customer');
@@ -121,13 +143,11 @@ export const ShipmentFormModal = ({ isOpen, onClose, order, onSubmit, loading })
               <select
                 value={carrier}
                 onChange={(e) => setCarrier(e.target.value)}
-                className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+                className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 font-medium"
               >
-                <option value="FedEx">FedEx</option>
-                <option value="UPS">UPS</option>
-                <option value="USPS">USPS</option>
-                <option value="DHL">DHL</option>
-                <option value="Standard Delivery">Standard Delivery / Local</option>
+                {availableCarriers.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
               </select>
             </div>
 
@@ -230,9 +250,10 @@ export const ShipmentFormModal = ({ isOpen, onClose, order, onSubmit, loading })
 export const ShipmentStatusModal = ({ isOpen, onClose, shipment, onSubmit, loading }) => {
   if (!isOpen || !shipment) return null;
 
+  const { carriers: availableCarriers } = useAvailableCarriers();
   const [status, setStatus] = useState(shipment.status || 'PREPARING');
   const [notes, setNotes] = useState(shipment.notes || '');
-  const [carrier, setCarrier] = useState(shipment.carrier || '');
+  const [carrier, setCarrier] = useState(shipment.carrier || 'Standard Delivery');
   const [trackingCode, setTrackingCode] = useState(shipment.tracking_code || '');
 
   const handleSubmit = (e) => {
@@ -269,12 +290,15 @@ export const ShipmentStatusModal = ({ isOpen, onClose, shipment, onSubmit, loadi
 
           <div>
             <label className="text-xs font-bold text-slate-300 block mb-1">Carrier</label>
-            <input
-              type="text"
-              value={carrier}
+            <select
+              value={carrier || 'Standard Delivery'}
               onChange={(e) => setCarrier(e.target.value)}
-              className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-sm text-white"
-            />
+              className="w-full bg-slate-900 border border-white/10 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 font-medium"
+            >
+              {availableCarriers.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
 
           <div>

@@ -1,1 +1,1 @@
-# Package marker for inventory app tests
+# Inventory Service Tests Package

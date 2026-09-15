@@ -54,8 +54,8 @@ class OrderDownstreamOutageTests(TestCase):
         self.assertEqual(Order.objects.count(), 0)
         self.assertEqual(OutboxEvent.objects.count(), 0)
 
-    @patch('orders.views.requests.post')
-    def test_payment_service_outage_on_checkout_initiation(self, mock_post):
+    @patch('orders.views.create_payment_checkout_grpc')
+    def test_payment_service_outage_on_checkout_initiation(self, mock_checkout):
         # Create pending order
         order = Order.objects.create(
             customer_id=self.user.id,
@@ -67,12 +67,13 @@ class OrderDownstreamOutageTests(TestCase):
         url = reverse('order_pay', kwargs={'order_id': order.id})
 
         # Simulate Payment service connection refusal
-        mock_post.side_effect = Exception("Connection refused by payment service")
+        mock_checkout.side_effect = Exception("Connection refused by payment service")
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         order.refresh_from_db()
         self.assertEqual(order.status, 'PENDING')
+
 
 
 class OrderSagaCompensatingTransactionTests(TestCase):

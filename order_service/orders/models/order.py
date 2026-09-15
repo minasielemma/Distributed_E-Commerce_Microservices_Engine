@@ -40,5 +40,14 @@ class Order(models.Model):
             models.Index(fields=['customer_id', '-created_at']),
         ]
 
+    def can_transition_to(self, target_status):
+        from orders.state_machine import OrderStateMachine
+        return OrderStateMachine.can_transition(self.status, target_status)
+
+    def transition_to(self, target_status, save=True):
+        from orders.state_machine import OrderStateMachine
+        return OrderStateMachine.transition(self, target_status, save=save)
+
     def __str__(self):
         return f"Order {self.id} - Customer {self.customer_id} (${self.total_amount})"
+

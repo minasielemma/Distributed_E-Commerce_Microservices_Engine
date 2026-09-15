@@ -1,1 +1,1 @@
-# Package marker for catalog app tests
+# Catalog Service Tests Package

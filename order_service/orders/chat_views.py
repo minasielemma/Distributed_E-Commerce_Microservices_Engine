@@ -22,18 +22,16 @@ logger = logging.getLogger(__name__)
 
 def send_notification_to_identity(user_id, tenant_id, title, message, notif_type='CHAT', metadata=None):
     try:
-        identity_url = getattr(settings, 'IDENTITY_SERVICE_URL', 'http://identity_service:8000')
-        payload = {
-            'user_id': str(user_id) if user_id else None,
-            'tenant_id': str(tenant_id) if tenant_id else None,
-            'title': title,
-            'message': message,
-            'notification_type': notif_type,
-            'metadata': metadata or {},
-        }
-        requests.post(f"{identity_url}/api/notifications/create_internal/", json=payload, timeout=3)
+        from orders.grpc_client import send_notification_grpc
+        send_notification_grpc(
+            recipient_id=str(user_id) if user_id else None,
+            tenant_id=str(tenant_id) if tenant_id else None,
+            title=title,
+            message=message,
+            notification_type=notif_type
+        )
     except Exception as e:
-        logger.warning(f"Failed to push notification to identity_service: {e}")
+        logger.warning(f"Failed to push notification to identity_service via gRPC: {e}")
 
 
 def broadcast_notification_ws(group_name, title, message, notif_type='CHAT', metadata=None):

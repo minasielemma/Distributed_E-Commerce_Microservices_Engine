@@ -19,8 +19,21 @@ export default function OrdersPage() {
   const [editingShipment, setEditingShipment] = useState(null);
   const [dispatchModalOrder, setDispatchModalOrder] = useState(null);
   const [carrier, setCarrier] = useState('Standard Delivery');
+  const [availableCarriers, setAvailableCarriers] = useState(['Standard Delivery', 'FedEx', 'UPS', 'USPS', 'DHL']);
   const [trackingCode, setTrackingCode] = useState('');
-  const [payingId, setPayingId] = useState(null);
+
+  useEffect(() => {
+    orderService.getAvailableCarriers()
+      .then(res => {
+        const names = res?.data?.names || (Array.isArray(res?.data?.carriers) ? res.data.carriers.map(c => c.name) : null);
+        if (names && names.length > 0) {
+          setAvailableCarriers(names);
+        }
+      })
+      .catch(err => {
+        console.warn('Could not fetch available carriers dynamically:', err);
+      });
+  }, []);
   const [dispatchingId, setDispatchingId] = useState(null);
   const [updatingShipment, setUpdatingShipment] = useState(false);
   const { showSuccess, showError } = useToast();
@@ -32,29 +45,49 @@ export default function OrdersPage() {
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { page, page_size: pageSize };
+      const tenantId = activeTenant?.id;
+      const params = {
+        page,
+        page_size: pageSize,
+      };
+
+      if (tenantId) {
+        params.tenant_id = tenantId;
+      }
+
       if (statusFilter !== 'ALL') {
         params.status = statusFilter;
       }
+
       const res = await orderService.getOrders(params);
-      const resData = res?.data;
-      const list = Array.isArray(resData) ? resData : (resData?.results || []);
-      setOrders(list);
-      updatePaginationState(resData);
+      const data = res?.data;
+      const list = Array.isArray(data) ? data : (data?.results || data?.orders || []);
+      setOrders(Array.isArray(list) ? list : []);
+
+      if (data?.count !== undefined) {
+        updatePaginationState(data.count, page);
+      } else {
+        updatePaginationState(list.length, page);
+      }
     } catch (err) {
+      console.error(err);
       showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, statusFilter, updatePaginationState, showError, activeTenant?.id]);
+  }, [page, pageSize, statusFilter, activeTenant, showError, updatePaginationState]);
 
   const fetchOutbox = async () => {
+    setOutboxLoading(true);
     try {
       const res = await orderService.getOutboxEvents();
       const list = Array.isArray(res?.data) ? res.data : (res?.data?.results || []);
       setOutboxEvents(list);
     } catch (err) {
+      console.error(err);
       showError(getErrorMessage(err));
+    } finally {
+      setOutboxLoading(false);
     }
   };
 
@@ -78,35 +111,19 @@ export default function OrdersPage() {
           })
         );
       } else if (notif.notification_type === 'ORDER' || notif.notification_type === 'PAYMENT' || notif.notification_type === 'SHIPMENT') {
-        fetchOrders();
+        if (activeTab === 'orders') fetchOrders();
       }
     };
 
     window.addEventListener('notification_received', handleRealtimeNotification);
     return () => window.removeEventListener('notification_received', handleRealtimeNotification);
-  }, [fetchOrders, activeTab, activeTenant?.id]);
+  }, [fetchOrders, activeTab]);
 
   useEffect(() => {
     if (activeTab === 'outbox') {
       fetchOutbox();
     }
   }, [activeTab]);
-
-  const handlePayOrder = async (orderId) => {
-    setPayingId(orderId);
-    try {
-      const res = await orderService.payOrder(orderId);
-      showSuccess('Order payment process triggered successfully');
-      if (res.data?.checkout_url) {
-        window.open(res.data.checkout_url, '_blank');
-      }
-      fetchOrders();
-    } catch (err) {
-      showError(getErrorMessage(err));
-    } finally {
-      setPayingId(null);
-    }
-  };
 
   const openDispatchModal = (order) => {
     setDispatchModalOrder(order);
@@ -285,16 +302,7 @@ export default function OrdersPage() {
                           <button onClick={() => openOrderDetails(o)} className="p-1.5 rounded-lg bg-white/5 text-slate-300 hover:text-white hover:bg-white/10" title="View details">
                             <Eye className="w-4 h-4" />
                           </button>
-                          {['PENDING', 'UNPAID', 'CREATED'].includes((o.status || '').toUpperCase()) && (
-                            <button
-                              onClick={() => handlePayOrder(o.id)}
-                              disabled={payingId === o.id}
-                              className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
-                            >
-                              {payingId === o.id ? '...' : 'Pay'}
-                            </button>
-                          )}
-                          {!['SHIPPED', 'DELIVERED', 'CANCELLED'].includes((o.status || '').toUpperCase()) && (
+                          {['PAID', 'PROCESSING'].includes((o.status || '').toUpperCase()) && (
                             <button
                               onClick={() => openDispatchModal(o)}
                               className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-md shadow-emerald-900/30"
@@ -305,6 +313,7 @@ export default function OrdersPage() {
                             </button>
                           )}
                         </td>
+
                       </tr>
                     ))}
               </DataTable>
@@ -370,15 +379,17 @@ export default function OrdersPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Carrier Name</label>
-              <input
-                type="text"
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Tracking Carrier</label>
+              <select
                 value={carrier}
                 onChange={(e) => setCarrier(e.target.value)}
-                placeholder="e.g. DHL Express, FedEx, UPS, Standard Delivery"
                 required
-                className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
-              />
+                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500 font-medium"
+              >
+                {availableCarriers.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -498,7 +509,7 @@ export default function OrdersPage() {
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-              {!['SHIPPED', 'DELIVERED', 'CANCELLED'].includes((selectedOrder.status || '').toUpperCase()) && (
+              {['PAID', 'PROCESSING'].includes((selectedOrder.status || '').toUpperCase()) && (
                 <button
                   onClick={() => {
                     const ord = selectedOrder;
@@ -511,6 +522,7 @@ export default function OrdersPage() {
                   Start Shipment & Dispatch Order
                 </button>
               )}
+
               <button onClick={() => setSelectedOrder(null)} className="px-4 py-2 rounded-xl border border-white/10 text-slate-300 hover:bg-white/10 text-xs">
                 Close
               </button>

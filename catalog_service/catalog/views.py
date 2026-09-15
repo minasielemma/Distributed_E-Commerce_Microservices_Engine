@@ -552,19 +552,11 @@ class ProductViewSet(FullBaseViewSet):
         tenant_id =getattr (self .request .user ,'tenant_id',None )
         product =serializer .save (tenant_id =tenant_id )
 
-        try :
-            import requests 
-            stock_qty =self .request .data .get ('initial_stock',100 )
-            requests .post (
-            "http://inventory_service:8000/api/inventory/items/init-product/",
-            json ={
-            "product_id":str (product .id ),
-            "tenant_id":str (tenant_id )if tenant_id else None ,
-            "quantity_available":int (stock_qty )
-            },
-            timeout =3 
-            )
-        except Exception :
+        try:
+            from catalog.grpc_client import init_inventory_product
+            stock_qty = self.request.data.get('initial_stock', 100)
+            init_inventory_product(product_id_str=str(product.id), sku_str=getattr(product, 'sku', ''), quantity=int(stock_qty))
+        except Exception:
             pass 
 
         try :

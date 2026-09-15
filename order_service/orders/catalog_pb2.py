@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rcatalog.proto\x12\x07\x63\x61talog\"\x1c\n\x0eProductRequest\x12\n\n\x02id\x18\x01 \x01(\t\"v\n\x0fProductResponse\x12\n\n\x02id\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\r\n\x05price\x18\x03 \x01(\x01\x12\x13\n\x0bstock_count\x18\x04 \x01(\x05\x12\r\n\x05\x66ound\x18\x05 \x01(\x08\x12\x15\n\rerror_message\x18\x06 \x01(\t2Q\n\x0eProductService\x12?\n\nGetProduct\x12\x17.catalog.ProductRequest\x1a\x18.catalog.ProductResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rcatalog.proto\x12\x07\x63\x61talog\"\x1c\n\x0eProductRequest\x12\n\n\x02id\x18\x01 \x01(\t\"\x9b\x01\n\x0fProductResponse\x12\n\n\x02id\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\r\n\x05price\x18\x03 \x01(\x01\x12\x13\n\x0bstock_count\x18\x04 \x01(\x05\x12\x11\n\ttenant_id\x18\x05 \x01(\t\x12\x10\n\x08polar_id\x18\x06 \x01(\t\x12\r\n\x05\x66ound\x18\x07 \x01(\x08\x12\x15\n\rerror_message\x18\x08 \x01(\t\"M\n\x15\x43ouponValidateRequest\x12\x0c\n\x04\x63ode\x18\x01 \x01(\t\x12\x11\n\ttenant_id\x18\x02 \x01(\t\x12\x13\n\x0border_total\x18\x03 \x01(\x01\"h\n\x16\x43ouponValidateResponse\x12\x10\n\x08is_valid\x18\x01 \x01(\x08\x12\x17\n\x0f\x64iscount_amount\x18\x02 \x01(\x01\x12\x0c\n\x04\x63ode\x18\x03 \x01(\t\x12\x15\n\rerror_message\x18\x04 \x01(\t\"]\n\x13\x43ouponRedeemRequest\x12\x0c\n\x04\x63ode\x18\x01 \x01(\t\x12\x11\n\ttenant_id\x18\x02 \x01(\t\x12\x10\n\x08order_id\x18\x03 \x01(\t\x12\x13\n\x0border_total\x18\x04 \x01(\x01\"W\n\x14\x43ouponRedeemResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x17\n\x0f\x64iscount_amount\x18\x02 \x01(\x01\x12\x15\n\rerror_message\x18\x03 \x01(\t\"(\n\x14\x43ouponConfirmRequest\x12\x10\n\x08order_id\x18\x01 \x01(\t\"9\n\x15\x43ouponConfirmResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\"(\n\x14\x43ouponReverseRequest\x12\x10\n\x08order_id\x18\x01 \x01(\t\"8\n\x15\x43ouponReverseResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0e\n\x06status\x18\x02 \x01(\t\"$\n\x0ePolarIdRequest\x12\x12\n\nproduct_id\x18\x01 \x01(\t\"F\n\x0fPolarIdResponse\x12\x12\n\nproduct_id\x18\x01 \x01(\t\x12\x10\n\x08polar_id\x18\x02 \x01(\t\x12\r\n\x05\x66ound\x18\x03 \x01(\x08\"6\n\x13ListProductsRequest\x12\x0c\n\x04page\x18\x01 \x01(\x05\x12\x11\n\tpage_size\x18\x02 \x01(\x05\"W\n\x14ListProductsResponse\x12*\n\x08products\x18\x01 \x03(\x0b\x32\x18.catalog.ProductResponse\x12\x13\n\x0btotal_count\x18\x02 \x01(\x05\x32\xa6\x04\n\x0eProductService\x12?\n\nGetProduct\x12\x17.catalog.ProductRequest\x1a\x18.catalog.ProductResponse\x12Q\n\x0eValidateCoupon\x12\x1e.catalog.CouponValidateRequest\x1a\x1f.catalog.CouponValidateResponse\x12K\n\x0cRedeemCoupon\x12\x1c.catalog.CouponRedeemRequest\x1a\x1d.catalog.CouponRedeemResponse\x12N\n\rConfirmCoupon\x12\x1d.catalog.CouponConfirmRequest\x1a\x1e.catalog.CouponConfirmResponse\x12N\n\rReverseCoupon\x12\x1d.catalog.CouponReverseRequest\x1a\x1e.catalog.CouponReverseResponse\x12\x46\n\x11GetProductPolarId\x12\x17.catalog.PolarIdRequest\x1a\x18.catalog.PolarIdResponse\x12K\n\x0cListProducts\x12\x1c.catalog.ListProductsRequest\x1a\x1d.catalog.ListProductsResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,8 +33,32 @@ if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_PRODUCTREQUEST']._serialized_start=26
   _globals['_PRODUCTREQUEST']._serialized_end=54
-  _globals['_PRODUCTRESPONSE']._serialized_start=56
-  _globals['_PRODUCTRESPONSE']._serialized_end=174
-  _globals['_PRODUCTSERVICE']._serialized_start=176
-  _globals['_PRODUCTSERVICE']._serialized_end=257
+  _globals['_PRODUCTRESPONSE']._serialized_start=57
+  _globals['_PRODUCTRESPONSE']._serialized_end=212
+  _globals['_COUPONVALIDATEREQUEST']._serialized_start=214
+  _globals['_COUPONVALIDATEREQUEST']._serialized_end=291
+  _globals['_COUPONVALIDATERESPONSE']._serialized_start=293
+  _globals['_COUPONVALIDATERESPONSE']._serialized_end=397
+  _globals['_COUPONREDEEMREQUEST']._serialized_start=399
+  _globals['_COUPONREDEEMREQUEST']._serialized_end=492
+  _globals['_COUPONREDEEMRESPONSE']._serialized_start=494
+  _globals['_COUPONREDEEMRESPONSE']._serialized_end=581
+  _globals['_COUPONCONFIRMREQUEST']._serialized_start=583
+  _globals['_COUPONCONFIRMREQUEST']._serialized_end=623
+  _globals['_COUPONCONFIRMRESPONSE']._serialized_start=625
+  _globals['_COUPONCONFIRMRESPONSE']._serialized_end=682
+  _globals['_COUPONREVERSEREQUEST']._serialized_start=684
+  _globals['_COUPONREVERSEREQUEST']._serialized_end=724
+  _globals['_COUPONREVERSERESPONSE']._serialized_start=726
+  _globals['_COUPONREVERSERESPONSE']._serialized_end=782
+  _globals['_POLARIDREQUEST']._serialized_start=784
+  _globals['_POLARIDREQUEST']._serialized_end=820
+  _globals['_POLARIDRESPONSE']._serialized_start=822
+  _globals['_POLARIDRESPONSE']._serialized_end=892
+  _globals['_LISTPRODUCTSREQUEST']._serialized_start=894
+  _globals['_LISTPRODUCTSREQUEST']._serialized_end=948
+  _globals['_LISTPRODUCTSRESPONSE']._serialized_start=950
+  _globals['_LISTPRODUCTSRESPONSE']._serialized_end=1037
+  _globals['_PRODUCTSERVICE']._serialized_start=1040
+  _globals['_PRODUCTSERVICE']._serialized_end=1590
 # @@protoc_insertion_point(module_scope)

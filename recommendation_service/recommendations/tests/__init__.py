@@ -1,1 +1,1 @@
-# Package marker for recommendations app tests
+# Recommendation Service Tests Package

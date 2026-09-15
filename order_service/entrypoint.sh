@@ -15,6 +15,9 @@ elif [ "$SERVICE_TYPE" = "kafka_consumer" ]; then
     echo "[Order Service] Starting Kafka Event Consumer..."
     exec python manage.py consume_kafka_events
 else
+    echo "[Order Service] Starting gRPC server on port 50054..."
+    python manage.py run_grpc &
+
     echo "[Order Service] Starting Daphne ASGI server on port 8000..."
     exec daphne -b 0.0.0.0 -p 8000 order_project.asgi:application
 fi

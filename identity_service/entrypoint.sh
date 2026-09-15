@@ -11,5 +11,8 @@ python manage.py migrate --noinput
 echo "[Identity Service] Creating default superuser if absent..."
 python manage.py create_default_admin
 
+echo "[Identity Service] Starting gRPC server on port 50053..."
+python manage.py run_grpc &
+
 echo "[Identity Service] Starting Gunicorn server..."
 exec gunicorn identity_project.wsgi:application --bind 0.0.0.0:8000 --workers 2

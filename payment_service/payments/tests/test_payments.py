@@ -103,3 +103,34 @@ class PaymentSagaTests(TestCase):
         payment = Payment.objects.get(order_id=self.order_id)
         self.assertEqual(payment.status, 'REFUNDED')
         self.assertTrue(OutboxEvent.objects.filter(event_type='payment.refunded').exists())
+
+
+class PolarCheckoutViewTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.payment_id = uuid.uuid4()
+        self.order_id = uuid.uuid4()
+        self.payment = Payment.objects.create(
+            id=self.payment_id,
+            order_id=self.order_id,
+            customer_id=uuid.uuid4(),
+            amount=99.99,
+            status='PENDING',
+            provider='POLAR'
+        )
+
+    @patch('payments.views.post_order_payment_journal_entry')
+    @patch('payments.grpc_client.mark_order_paid_grpc')
+    def test_polar_checkout_get_success(self, mock_mark_paid, mock_journal):
+        url = reverse('polar_checkout', kwargs={'payment_id': str(self.payment_id)})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'PAID')
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, 'PAID')
+
+    def test_polar_checkout_not_found(self):
+        url = reverse('polar_checkout', kwargs={'payment_id': str(uuid.uuid4())})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+

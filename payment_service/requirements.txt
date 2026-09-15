@@ -8,3 +8,6 @@ requests>=2.31.0
 PyJWT>=2.8.0
 gunicorn>=21.2.0
 drf-yasg>=1.21.7
+
+grpcio>=1.60.0
+grpcio-tools>=1.60.0

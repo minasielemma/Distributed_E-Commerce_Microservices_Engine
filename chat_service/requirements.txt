@@ -9,3 +9,6 @@ kafka-python>=2.0.2
 requests>=2.31.0
 django-cors-headers>=4.3.0
 gunicorn>=21.2.0
+
+grpcio>=1.60.0
+grpcio-tools>=1.60.0

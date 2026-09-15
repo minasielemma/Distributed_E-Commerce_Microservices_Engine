@@ -62,6 +62,10 @@ class OrderShipmentListView(views.APIView):
         if str(order.tenant_id) != tenant_id and role not in ['ADMIN', 'SUPERADMIN']:
             return Response({'error': 'Not authorized for this store order'}, status=status.HTTP_403_FORBIDDEN)
 
+        # Rule: Unpaid orders (PENDING or FAILED) cannot be shipped
+        if order.status in ['PENDING', 'FAILED', 'CANCELLED']:
+            return Response({'error': f"Unpaid order {order.id} cannot be shipped. Current status is '{order.status}'. Order must be PAID before shipping."}, status=status.HTTP_400_BAD_REQUEST)
+
         data = request.data.copy()
         data['order'] = str(order.id)
 
@@ -111,19 +115,21 @@ class OrderShipmentListView(views.APIView):
                     }
                 )
 
-                # Update order status to SHIPPED if applicable
-                if shipment.status in ['SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] and order.status in ['PAID', 'PENDING']:
-                    old_order_status = order.status
-                    order.status = 'SHIPPED'
-                    order.save(update_fields=['status'])
-                    StatusHistory.objects.create(
-                        entity_type='order',
-                        entity_id=order.id,
-                        from_status=old_order_status,
-                        to_status='SHIPPED',
-                        changed_by=request.user.id,
-                        notes=f"Order marked SHIPPED via shipment {shipment.tracking_code}"
-                    )
+                # Update order status to SHIPPED if applicable using State Machine
+                if shipment.status in ['SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] and order.status != 'SHIPPED':
+                    from orders.state_machine import OrderStateMachine
+                    if OrderStateMachine.can_transition(order.status, 'SHIPPED'):
+                        old_order_status = order.status
+                        OrderStateMachine.transition(order, 'SHIPPED')
+                        StatusHistory.objects.create(
+                            entity_type='order',
+                            entity_id=order.id,
+                            from_status=old_order_status,
+                            to_status='SHIPPED',
+                            changed_by=request.user.id,
+                            notes=f"Order marked SHIPPED via shipment {shipment.tracking_code}"
+                        )
+
 
             return Response(ShippingSerializer(shipment).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -209,29 +215,32 @@ class UpdateShipmentStatusView(views.APIView):
                 any_shipped = any(s.status in ['SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED'] for s in all_shipments)
 
                 if all_delivered and order.status != 'DELIVERED':
-                    prev_order_status = order.status
-                    order.status = 'DELIVERED'
-                    order.save(update_fields=['status'])
-                    StatusHistory.objects.create(
-                        entity_type='order',
-                        entity_id=order.id,
-                        from_status=prev_order_status,
-                        to_status='DELIVERED',
-                        changed_by=request.user.id,
-                        notes='Order auto-marked DELIVERED as all shipments completed'
-                    )
-                elif any_shipped and order.status in ['PAID', 'PENDING']:
-                    prev_order_status = order.status
-                    order.status = 'SHIPPED'
-                    order.save(update_fields=['status'])
-                    StatusHistory.objects.create(
-                        entity_type='order',
-                        entity_id=order.id,
-                        from_status=prev_order_status,
-                        to_status='SHIPPED',
-                        changed_by=request.user.id,
-                        notes='Order auto-marked SHIPPED'
-                    )
+                    from orders.state_machine import OrderStateMachine
+                    if OrderStateMachine.can_transition(order.status, 'DELIVERED'):
+                        prev_order_status = order.status
+                        OrderStateMachine.transition(order, 'DELIVERED')
+                        StatusHistory.objects.create(
+                            entity_type='order',
+                            entity_id=order.id,
+                            from_status=prev_order_status,
+                            to_status='DELIVERED',
+                            changed_by=request.user.id,
+                            notes='Order auto-marked DELIVERED as all shipments completed'
+                        )
+                elif any_shipped and order.status != 'SHIPPED':
+                    from orders.state_machine import OrderStateMachine
+                    if OrderStateMachine.can_transition(order.status, 'SHIPPED'):
+                        prev_order_status = order.status
+                        OrderStateMachine.transition(order, 'SHIPPED')
+                        StatusHistory.objects.create(
+                            entity_type='order',
+                            entity_id=order.id,
+                            from_status=prev_order_status,
+                            to_status='SHIPPED',
+                            changed_by=request.user.id,
+                            notes='Order auto-marked SHIPPED'
+                        )
+
 
             # Create outbox event for Kafka and notifications
             OutboxEvent.objects.create(

@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package order;
+
+service OrderService {
+  rpc GetOrder (GetOrderRequest) returns (GetOrderResponse);
+  rpc MarkOrderPaid (MarkPaidRequest) returns (MarkPaidResponse);
+}
+
+message GetOrderRequest {
+  string order_id = 1;
+}
+
+message GetOrderResponse {
+  string order_id = 1;
+  string customer_id = 2;
+  string tenant_id = 3;
+  string status = 4;
+  double total_amount = 5;
+  string created_at = 6;
+  bool found = 7;
+  string error_message = 8;
+}
+
+message MarkPaidRequest {
+  string order_id = 1;
+}
+
+message MarkPaidResponse {
+  bool success = 1;
+  string status = 2;
+  string message = 3;
+}

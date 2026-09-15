@@ -1,10 +1,8 @@
-import os
-import json
 import logging
-import urllib.request
 from celery import shared_task
 from .models import UserInteraction, ProductMetadataCache, CachedRecommendation
 from .engine import get_personalized_recommendations, get_trending_recommendations
+from .grpc_client import list_catalog_products_grpc
 
 logger = logging.getLogger(__name__)
 
@@ -47,32 +45,27 @@ def precompute_recommendations():
 @shared_task
 def sync_product_metadata():
     """
-    Periodic task to sync product metadata from catalog_service into ProductMetadataCache.
+    Periodic task to sync product metadata from catalog_service into ProductMetadataCache via gRPC.
     """
-    logger.info("Starting product metadata sync from catalog_service...")
+    logger.info("Starting product metadata sync from catalog_service via gRPC...")
     try:
-        catalog_host = os.getenv('CATALOG_SERVICE_HOST', 'catalog_service')
-        url = f"http://{catalog_host}:8000/api/catalog/products/?page_size=100"
-        req = urllib.request.Request(url, headers={'Content-Type': 'application/json'})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            if resp.status == 200:
-                data = json.loads(resp.read().decode())
-                results = data.get('results', [])
-                for prod in results:
-                    pid = prod.get('id')
-                    if pid:
-                        ProductMetadataCache.objects.update_or_create(
-                            product_id=pid,
-                            defaults={
-                                'tenant_id': prod.get('tenant_id'),
-                                'name': prod.get('name', ''),
-                                'category_id': prod.get('category'),
-                                'category_name': prod.get('category_name', ''),
-                                'price': prod.get('base_price', 0.0),
-                                'rating_avg': prod.get('rating_avg', 0.0),
-                            }
-                        )
-                return f"Synced {len(results)} products to ProductMetadataCache."
+        results = list_catalog_products_grpc(page=1, page_size=100)
+        for prod in results:
+            pid = prod.id
+            if pid:
+                ProductMetadataCache.objects.update_or_create(
+                    product_id=pid,
+                    defaults={
+                        'tenant_id': prod.tenant_id,
+                        'name': prod.name,
+                        'category_id': prod.category,
+                        'category_name': prod.category_name,
+                        'price': prod.base_price,
+                        'rating_avg': prod.rating_avg,
+                    }
+                )
+        return f"Synced {len(results)} products to ProductMetadataCache."
     except Exception as e:
         logger.error(f"Failed product metadata sync: {e}")
         return f"Failed sync: {e}"
+

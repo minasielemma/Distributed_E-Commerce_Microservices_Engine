@@ -1,1 +1,1 @@
-# Package marker for notifications app tests
+# Notification Service Tests Package

@@ -124,14 +124,11 @@ class PolarPaymentProvider:
                 # Update catalog service with generated polar_product_id
                 if product_id:
                     try:
-                        requests.post(
-                            f"http://catalog_service:8000/api/catalog/products/{product_id}/polar-id/",
-                            json={"polar_product_id": polar_id},
-                            headers={"Host": "localhost", "Content-Type": "application/json"},
-                            timeout=3
-                        )
+                        from payments.grpc_client import get_product_polar_id_grpc
+                        get_product_polar_id_grpc(product_id)
                     except Exception as cat_err:
-                        logger.warning(f"Could not save polar_product_id back to catalog service: {cat_err}")
+                        logger.warning(f"Could not check polar_product_id in catalog service via gRPC: {cat_err}")
+
 
                 return polar_id
             else:
@@ -153,15 +150,10 @@ class PolarPaymentProvider:
         # 2. Try fetching from catalog_service if product_id is provided
         if catalog_product_id:
             try:
-                cat_res = requests.get(
-                    f"http://catalog_service:8000/api/catalog/products/{catalog_product_id}/", 
-                    headers={"Host": "localhost"},
-                    timeout=3
-                )
-
-                if cat_res.status_code == 200:
-                    prod_data = cat_res.json()
-                    existing_polar_id = prod_data.get("polar_product_id")
+                from payments.grpc_client import get_catalog_product
+                prod_data = get_catalog_product(catalog_product_id)
+                if prod_data and prod_data.found:
+                    existing_polar_id = prod_data.polar_id
                     
                     if not p_name:
                         p_name = prod_data.get("name")

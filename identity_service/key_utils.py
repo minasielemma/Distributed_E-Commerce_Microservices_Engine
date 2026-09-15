@@ -47,8 +47,23 @@ def signed_cert(cn, ca_key, ca_cert, is_server=False):
         .not_valid_after(now + datetime.timedelta(days=3650))
     )
     if is_server:
+        sans = [
+            x509.DNSName(cn),
+            x509.DNSName("catalog_service"),
+            x509.DNSName("cart_service"),
+            x509.DNSName("identity_service"),
+            x509.DNSName("inventory_service"),
+            x509.DNSName("order_service"),
+            x509.DNSName("payment_service"),
+            x509.DNSName("finance_service"),
+            x509.DNSName("recommendation_service"),
+            x509.DNSName("media_service"),
+            x509.DNSName("chat_service"),
+            x509.DNSName("notification_service"),
+            x509.DNSName("localhost"),
+        ]
         builder = builder.add_extension(
-            x509.SubjectAlternativeName([x509.DNSName(cn), x509.DNSName("catalog_service")]),
+            x509.SubjectAlternativeName(sans),
             critical=False
         )
     return key, builder.sign(ca_key, hashes.SHA256())

@@ -143,6 +143,7 @@ export const orderService = {
     api.post(`/orders/shipments/${shipmentId}/update-status/`, { status, notes, carrier, tracking_code, estimated_delivery_date }),
   getShipmentHistory: (entityId) => api.get(`/orders/shipments/${entityId}/history/`),
   trackPackage: (trackingCode) => api.get(`/orders/track/${trackingCode}/`),
+  getAvailableCarriers: () => api.get('/orders/carriers/'),
 };
 
 // --- CHAT SERVICE ---

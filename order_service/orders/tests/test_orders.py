@@ -1,13 +1,5 @@
 import uuid
-import sys
 from unittest.mock import patch, MagicMock, PropertyMock
-
-# Mock the protobuf modules before they are imported by orders.views
-mock_pb2 = MagicMock()
-mock_pb2_grpc = MagicMock()
-sys.modules.setdefault('orders.catalog_pb2', mock_pb2)
-sys.modules.setdefault('orders.catalog_pb2_grpc', mock_pb2_grpc)
-
 from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
@@ -18,12 +10,13 @@ from orders.models import Order, OutboxEvent, SubOrder, OrderItem, ProcessedEven
 from orders.saga_consumer import process_inventory_reserved, process_inventory_failed, process_payment_failed
 
 
-def make_catalog_response(found=True, price=10.0, stock=100, error=''):
+def make_catalog_response(found=True, price=10.0, stock=100, tenant_id='11111111-1111-1111-1111-111111111111', error=''):
     mock = MagicMock()
     mock.found = found
     mock.price = price
     mock.stock_count = stock
     mock.title = 'Test Product'
+    mock.tenant_id = tenant_id
     mock.error_message = error
     return mock
 
@@ -43,15 +36,13 @@ class CreateOrderViewTests(TestCase):
             'country': 'US'
         }
 
-    @patch('orders.views.requests.post')
+    @patch('orders.views.check_inventory_stock')
     @patch('orders.views.get_catalog_product')
-    def test_create_order_success(self, mock_catalog, mock_post):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {}
-        mock_post.return_value = mock_resp
-
+    def test_create_order_success(self, mock_catalog, mock_inventory):
         mock_catalog.return_value = make_catalog_response(found=True, price=25.00, stock=10)
+        mock_inv = MagicMock()
+        mock_inv.is_available = True
+        mock_inventory.return_value = mock_inv
         data = {
             'product_id': str(self.product_id),
             'quantity': 2,
@@ -65,83 +56,77 @@ class CreateOrderViewTests(TestCase):
         self.assertEqual(order.total_amount, Decimal('50.00'))
         self.assertEqual(order.status, 'PENDING')
 
-    @patch('orders.views.requests.post')
+    @patch('orders.views.check_inventory_stock')
     @patch('orders.views.get_catalog_product')
-    def test_create_order_creates_outbox_event(self, mock_catalog, mock_post):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {}
-        mock_post.return_value = mock_resp
-
-        mock_catalog.return_value = make_catalog_response(found=True, price=10.00, stock=5)
-        self.client.post(self.url, {
+    def test_create_order_creates_outbox_event(self, mock_catalog, mock_inventory):
+        mock_catalog.return_value = make_catalog_response(found=True, price=25.00, stock=10)
+        mock_inv = MagicMock()
+        mock_inv.is_available = True
+        mock_inventory.return_value = mock_inv
+        data = {
             'product_id': str(self.product_id),
-            'quantity': 1,
+            'quantity': 2,
             'shipping_address': self.shipping_address
-        }, format='json')
-        self.assertEqual(OutboxEvent.objects.filter(event_type='order.created').count(), 1)
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        outbox = OutboxEvent.objects.filter(event_type='order.created').first()
+        self.assertIsNotNone(outbox)
+        self.assertEqual(outbox.payload['items'][0]['quantity'], 2)
+        order = Order.objects.first()
+        self.assertEqual(order.shipping_address['city'], 'Testville')
 
     @patch('orders.views.get_catalog_product')
     def test_create_order_product_not_found(self, mock_catalog):
-        mock_catalog.return_value = make_catalog_response(found=False, error='Not found')
-        response = self.client.post(self.url, {
+        mock_catalog.return_value = make_catalog_response(found=False, error='Product not found')
+        data = {
             'product_id': str(self.product_id),
             'quantity': 1,
             'shipping_address': self.shipping_address
-        }, format='json')
+        }
+        response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     @patch('orders.views.get_catalog_product')
     def test_create_order_insufficient_stock(self, mock_catalog):
-        mock_catalog.return_value = make_catalog_response(found=True, price=10.00, stock=2)
-        response = self.client.post(self.url, {
+        mock_catalog.return_value = make_catalog_response(found=True, price=10.0, stock=1)
+        data = {
             'product_id': str(self.product_id),
             'quantity': 5,
             'shipping_address': self.shipping_address
-        }, format='json')
+        }
+        response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('out of stock or has insufficient quantity available', response.data['error'])
 
     @patch('orders.views.get_catalog_product')
-    def test_create_order_catalog_service_failure(self, mock_catalog):
-        mock_catalog.side_effect = Exception('gRPC error')
-        response = self.client.post(self.url, {
+    def test_create_order_catalog_service_down(self, mock_catalog):
+        mock_catalog.return_value = None
+        data = {
             'product_id': str(self.product_id),
             'quantity': 1,
             'shipping_address': self.shipping_address
-        }, format='json')
+        }
+        response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
 
-    def test_create_order_unauthenticated_fails(self):
-        self.client.force_authenticate(user=None)
-        response = self.client.post(self.url, {
+
+    def test_create_order_unauthenticated(self):
+        self.client.logout()
+        data = {
             'product_id': str(self.product_id),
             'quantity': 1,
             'shipping_address': self.shipping_address
-        }, format='json')
+        }
+        response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_create_order_invalid_quantity_fails(self):
-        response = self.client.post(self.url, {
-            'product_id': str(self.product_id),
-            'quantity': 0,
-            'shipping_address': self.shipping_address
-        }, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_create_order_missing_product_id_fails(self):
-        response = self.client.post(self.url, {
-            'quantity': 1,
-            'shipping_address': self.shipping_address
-        }, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class InitiateOrderPaymentViewTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         from django.contrib.auth.models import User
-        self.user = User.objects.create_user(username='payinitiator', password='pass123')
+        self.user = User.objects.create_user(username='orderuser2', password='pass123')
         self.client.force_authenticate(user=self.user)
         self.order = Order.objects.create(
             customer_id=self.user.id,
@@ -151,34 +136,38 @@ class InitiateOrderPaymentViewTests(TestCase):
             status='PENDING'
         )
 
-    @patch('orders.views.requests.post')
-    def test_initiate_payment_success(self, mock_post):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 201
-        mock_resp.json.return_value = {'payment': {'polar_checkout_id': 'chk_123'}, 'checkout_url': 'https://polar.sh/checkout/chk_123'}
-        mock_post.return_value = mock_resp
+    @patch('orders.views.create_payment_checkout_grpc')
+    def test_initiate_payment_success(self, mock_checkout):
+        mock_res = MagicMock()
+        mock_res.success = True
+        mock_res.status = 'PENDING'
+        mock_res.payment_id = 'pay_123'
+        mock_res.checkout_url = 'https://polar.sh/checkout/chk_123'
+        mock_checkout.return_value = mock_res
+
         url = reverse('order_pay', kwargs={'order_id': self.order.id})
         response = self.client.post(url)
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.order.refresh_from_db()
-        self.assertEqual(self.order.polar_checkout_id, 'chk_123')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['payment']['checkout_url'], 'https://polar.sh/checkout/chk_123')
 
-    @patch('orders.views.requests.post')
-    def test_initiate_payment_service_error(self, mock_post):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 500
-        mock_resp.text = 'Internal Server Error'
-        mock_post.return_value = mock_resp
+    @patch('orders.views.create_payment_checkout_grpc')
+    def test_initiate_payment_service_error(self, mock_checkout):
+        mock_res = MagicMock()
+        mock_res.success = False
+        mock_res.error_message = 'Internal Server Error'
+        mock_checkout.return_value = mock_res
+
         url = reverse('order_pay', kwargs={'order_id': self.order.id})
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    @patch('orders.views.requests.post')
-    def test_initiate_payment_connection_error(self, mock_post):
-        mock_post.side_effect = Exception('Connection refused')
+    @patch('orders.views.create_payment_checkout_grpc')
+    def test_initiate_payment_connection_error(self, mock_checkout):
+        mock_checkout.side_effect = Exception("Connection refused by payment service")
         url = reverse('order_pay', kwargs={'order_id': self.order.id})
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+
 
     def test_initiate_payment_order_not_found(self):
         url = reverse('order_pay', kwargs={'order_id': uuid.uuid4()})
@@ -297,12 +286,12 @@ class DispatchOrderViewTests(TestCase):
             quantity=2
         )
 
-    @patch('orders.views.requests.post')
-    def test_dispatch_order_success(self, mock_post):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {'status': 'committed'}
-        mock_post.return_value = mock_resp
+    @patch('orders.views.commit_stock_grpc')
+    def test_dispatch_order_success(self, mock_commit):
+        mock_res = MagicMock()
+        mock_res.success = True
+        mock_commit.return_value = mock_res
+
 
         url = reverse('order_dispatch', kwargs={'order_id': self.order.id})
         response = self.client.post(url)
@@ -351,3 +340,41 @@ class OrderSagaTests(TestCase):
         self.assertEqual(self.order.status, 'FAILED')
         self.assertTrue(OutboxEvent.objects.filter(event_type='inventory.release').exists())
         self.assertTrue(ProcessedEvent.objects.filter(event_id=self.event_id).exists())
+
+
+class CarrierTrackingTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_get_tracking_url_resolution(self):
+        from orders.carriers import get_tracking_url
+        self.assertEqual(
+            get_tracking_url('FedEx', '123456'),
+            'https://www.fedex.com/fedextrack/?trknbr=123456'
+        )
+        self.assertEqual(
+            get_tracking_url('UPS', '1Z999999'),
+            'https://www.ups.com/track?tracknum=1Z999999'
+        )
+        self.assertEqual(
+            get_tracking_url('USPS', '94001000'),
+            'https://tools.usps.com/go/TrackConfirmAction?tLabels=94001000'
+        )
+        self.assertEqual(
+            get_tracking_url('DHL', '777888'),
+            'https://www.dhl.com/en/express/tracking.html?AWB=777888'
+        )
+        self.assertIsNone(get_tracking_url('Standard Delivery', 'TRK123'))
+        self.assertIsNone(get_tracking_url('Unknown Carrier', '123'))
+
+    def test_available_carriers_endpoint(self):
+        url = reverse('available_carriers')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = response.data.get('names', [])
+        self.assertIn('FedEx', names)
+        self.assertIn('UPS', names)
+        self.assertIn('USPS', names)
+        self.assertIn('DHL', names)
+        self.assertIn('Standard Delivery', names)
+

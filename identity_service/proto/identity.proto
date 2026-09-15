@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package identity;
+
+service IdentityService {
+  rpc LookupUsers (UserLookupRequest) returns (UserLookupResponse);
+  rpc CreateInternalNotification (NotificationRequest) returns (NotificationResponse);
+  rpc CreateAuditLog (AuditLogRequest) returns (AuditLogResponse);
+}
+
+message UserLookupRequest {
+  string user_id = 1;
+  string tenant_id = 2;
+  string role = 3;
+}
+
+message UserData {
+  string id = 1;
+  string email = 2;
+  string role = 3;
+  string tenant_id = 4;
+  string first_name = 5;
+  string last_name = 6;
+}
+
+message UserLookupResponse {
+  repeated UserData users = 1;
+}
+
+message NotificationRequest {
+  string recipient_id = 1;
+  string tenant_id = 2;
+  string title = 3;
+  string message = 4;
+  string notification_type = 5;
+}
+
+message NotificationResponse {
+  bool success = 1;
+  string notification_id = 2;
+}
+
+message AuditLogRequest {
+  string service_name = 1;
+  string action = 2;
+  string user_id = 3;
+  string tenant_id = 4;
+  string details = 5;
+}
+
+message AuditLogResponse {
+  bool success = 1;
+}

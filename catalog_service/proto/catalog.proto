@@ -2,10 +2,14 @@ syntax = "proto3";
 
 package catalog;
 
-// Service definition for Catalog Product Service
 service ProductService {
-  // Synchronous gRPC call to retrieve product stock and price
   rpc GetProduct (ProductRequest) returns (ProductResponse);
+  rpc ValidateCoupon (CouponValidateRequest) returns (CouponValidateResponse);
+  rpc RedeemCoupon (CouponRedeemRequest) returns (CouponRedeemResponse);
+  rpc ConfirmCoupon (CouponConfirmRequest) returns (CouponConfirmResponse);
+  rpc ReverseCoupon (CouponReverseRequest) returns (CouponReverseResponse);
+  rpc GetProductPolarId (PolarIdRequest) returns (PolarIdResponse);
+  rpc ListProducts (ListProductsRequest) returns (ListProductsResponse);
 }
 
 message ProductRequest {
@@ -17,6 +21,72 @@ message ProductResponse {
   string title = 2;
   double price = 3;
   int32 stock_count = 4;
-  bool found = 5;
-  string error_message = 6;
+  string tenant_id = 5;
+  string polar_id = 6;
+  bool found = 7;
+  string error_message = 8;
+}
+
+message CouponValidateRequest {
+  string code = 1;
+  string tenant_id = 2;
+  double order_total = 3;
+}
+
+message CouponValidateResponse {
+  bool is_valid = 1;
+  double discount_amount = 2;
+  string code = 3;
+  string error_message = 4;
+}
+
+message CouponRedeemRequest {
+  string code = 1;
+  string tenant_id = 2;
+  string order_id = 3;
+  double order_total = 4;
+}
+
+message CouponRedeemResponse {
+  bool success = 1;
+  double discount_amount = 2;
+  string error_message = 3;
+}
+
+message CouponConfirmRequest {
+  string order_id = 1;
+}
+
+message CouponConfirmResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message CouponReverseRequest {
+  string order_id = 1;
+}
+
+message CouponReverseResponse {
+  bool success = 1;
+  string status = 2;
+}
+
+message PolarIdRequest {
+  string product_id = 1;
+}
+
+message PolarIdResponse {
+  string product_id = 1;
+  string polar_id = 2;
+  bool found = 3;
+}
+
+message ListProductsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+
+message ListProductsResponse {
+  repeated ProductResponse products = 1;
+  int32 total_count = 2;
 }

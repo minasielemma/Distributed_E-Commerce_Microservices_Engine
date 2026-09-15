@@ -1,7 +1,6 @@
 import os
 import json
 import logging
-import urllib.request
 from rest_framework import permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -16,10 +15,11 @@ from .engine import (
 from .graph_sync import sync_event_to_graph
 from .models import ProductMetadataCache, CachedRecommendation
 from .serializers import TrackViewSerializer
+from .grpc_client import get_catalog_product_grpc
 
 logger = logging.getLogger(__name__)
 
-# [Existing functions and classes omitted until end of file]
+
 class RecommendedMerchantsView(APIView):
     permission_classes = (permissions.AllowAny,)
 
@@ -41,7 +41,7 @@ class RecommendedCategoriesView(APIView):
 
 def enrich_recommendations_with_catalog(recs, tenant_id=None):
     """
-    Enriches recommendation items with full product details from catalog_service or ProductMetadataCache.
+    Enriches recommendation items with full product details from catalog_service or ProductMetadataCache via gRPC.
     """
     if not recs:
         return []
@@ -52,23 +52,25 @@ def enrich_recommendations_with_catalog(recs, tenant_id=None):
 
     catalog_map = {}
 
-    # Try fetching from catalog_service via internal HTTP
-    try:
-        catalog_host = os.getenv('CATALOG_SERVICE_HOST', 'catalog_service')
-        # Fetch products from catalog_service
-        # We can bulk fetch or query catalog API
-        for pid in product_ids[:20]:
-            try:
-                url = f"http://{catalog_host}:8000/api/catalog/products/{pid}/"
-                req = urllib.request.Request(url, headers={'Content-Type': 'application/json'})
-                with urllib.request.urlopen(req, timeout=1.5) as resp:
-                    if resp.status == 200:
-                        prod_data = json.loads(resp.read().decode())
-                        catalog_map[str(pid)] = prod_data
-            except Exception:
-                pass
-    except Exception as e:
-        logger.warning(f"Failed to fetch catalog product details: {e}")
+    # Fetch from catalog_service via gRPC
+    for pid in product_ids[:20]:
+        try:
+            prod_pb = get_catalog_product_grpc(pid)
+            if prod_pb and getattr(prod_pb, 'found', False) and prod_pb.id:
+                title = getattr(prod_pb, 'title', '') or getattr(prod_pb, 'name', '')
+                price = float(getattr(prod_pb, 'price', 0.0))
+                catalog_map[str(pid)] = {
+                    'id': str(prod_pb.id),
+                    'name': title,
+                    'price': price,
+                    'base_price': price,
+                    'category_name': getattr(prod_pb, 'category_name', ''),
+                    'rating_avg': getattr(prod_pb, 'rating_avg', 0.0),
+                    'images': []
+                }
+        except Exception as e:
+            logger.warning(f"Failed to fetch catalog product details via gRPC for {pid}: {e}")
+
 
     # For any missing products, fallback to ProductMetadataCache
     missing_ids = [pid for pid in product_ids if str(pid) not in catalog_map]

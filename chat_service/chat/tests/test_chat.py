@@ -1,6 +1,7 @@
 import uuid
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from django.test import TestCase
+
 from rest_framework.test import APIClient
 from rest_framework import status
 from chat.models import ChatRoom, RoomParticipant
@@ -193,15 +194,13 @@ class AutoAddParticipantsTests(TestCase):
         self.tenant_id = uuid.uuid4()
         self.order_id = uuid.uuid4()
 
-    @patch('requests.get')
-    def test_auto_add_store_owner_with_tenant_id(self, mock_get):
-        mock_response = mock_get.return_value
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            'results': [
-                {'id': str(self.store_owner_id), 'username': 'shop_owner_1', 'role': 'STORE_OWNER'}
-            ]
-        }
+    @patch('chat.grpc_client.lookup_users_grpc')
+    def test_auto_add_store_owner_with_tenant_id(self, mock_lookup):
+        mock_user = MagicMock()
+        mock_user.id = str(self.store_owner_id)
+        mock_user.email = 'shop_owner_1'
+        mock_user.role = 'STORE_OWNER'
+        mock_lookup.return_value = [mock_user]
 
         client = APIClient()
         user = MockGatewayUser(self.creator_id)
@@ -216,26 +215,19 @@ class AutoAddParticipantsTests(TestCase):
         room_id = response.data['id']
         self.assertTrue(RoomParticipant.objects.filter(room_id=room_id, user_id=self.store_owner_id).exists())
 
-    @patch('requests.get')
-    def test_auto_add_store_owner_with_order_id(self, mock_get):
-        def side_effect(url, **kwargs):
-            class MockResponse:
-                def __init__(self, status_code, data):
-                    self.status_code = status_code
-                    self._data = data
-                    self.text = ""
-                def json(self):
-                    return self._data
+    @patch('chat.grpc_client.get_order_grpc')
+    @patch('chat.grpc_client.lookup_users_grpc')
+    def test_auto_add_store_owner_with_order_id(self, mock_lookup, mock_order):
+        mock_ord = MagicMock()
+        mock_ord.found = True
+        mock_ord.tenant_id = str(self.tenant_id)
+        mock_order.return_value = mock_ord
 
-            if 'order_service' in url or '/api/orders/' in url:
-                return MockResponse(200, {'id': str(self.order_id), 'tenant_id': str(self.tenant_id)})
-            if 'identity_service' in url or '/lookup/' in url:
-                return MockResponse(200, {
-                    'results': [{'id': str(self.store_owner_id), 'username': 'shop_owner_1', 'role': 'STORE_OWNER'}]
-                })
-            return MockResponse(404, {})
-
-        mock_get.side_effect = side_effect
+        mock_user = MagicMock()
+        mock_user.id = str(self.store_owner_id)
+        mock_user.email = 'shop_owner_1'
+        mock_user.role = 'STORE_OWNER'
+        mock_lookup.return_value = [mock_user]
 
         client = APIClient()
         user = MockGatewayUser(self.creator_id)
@@ -248,6 +240,7 @@ class AutoAddParticipantsTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         room_id = response.data['id']
         self.assertTrue(RoomParticipant.objects.filter(room_id=room_id, user_id=self.store_owner_id).exists())
+
 
     @patch('chat.views.broadcast_room_ws')
     def test_send_message_broadcasts_new_message_event(self, mock_broadcast):

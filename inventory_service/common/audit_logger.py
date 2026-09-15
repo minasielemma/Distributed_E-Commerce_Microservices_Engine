@@ -1,48 +1,54 @@
 import os
+import json
 import logging
-import requests
+import grpc
+from inventory.identity_pb2 import AuditLogRequest
+from inventory.identity_pb2_grpc import IdentityServiceStub
 
 logger = logging.getLogger(__name__)
 
-def log_audit_event(request, action, resource_type="", resource_id="", status="SUCCESS", details=None, changes=None):
-    """
-    Sends a non-blocking internal HTTP POST to identity_service to record a production audit log event.
-    Safely redacts sensitive parameters.
-    """
-    try:
-        identity_host = os.getenv("IDENTITY_SERVICE_HOST", "identity_service")
-        target_url = f"http://{identity_host}:8000/api/auth/audit-logs/create-internal/"
+KEYS_DIR = os.getenv('KEYS_DIR', '/shared_keys')
+IDENTITY_GRPC_HOST = os.getenv('IDENTITY_GRPC_HOST', 'identity_service:50053')
 
+
+def _get_channel_credentials():
+    ca_path = os.path.join(KEYS_DIR, 'grpc_ca.crt')
+    client_cert_path = os.path.join(KEYS_DIR, 'grpc_client.crt')
+    client_key_path = os.path.join(KEYS_DIR, 'grpc_client.key')
+
+    if os.path.exists(ca_path) and os.path.exists(client_cert_path) and os.path.exists(client_key_path):
+        ca_cert = open(ca_path, 'rb').read()
+        client_cert = open(client_cert_path, 'rb').read()
+        client_key = open(client_key_path, 'rb').read()
+        return grpc.ssl_channel_credentials(
+            root_certificates=ca_cert,
+            private_key=client_key,
+            certificate_chain=client_cert,
+        )
+    return None
+
+
+def log_audit_event(request, action, resource_type="", resource_id="", status="SUCCESS", details=None, changes=None):
+    try:
         user = getattr(request, 'user', None)
         actor_id = getattr(user, 'id', None) if user and hasattr(user, 'id') else None
-        actor_email = getattr(user, 'email', '') or getattr(user, 'username', '') if user else ''
-        actor_role = getattr(user, 'role', '') if user else ''
-        tenant_id = getattr(user, 'tenant_id', None) or request.headers.get('X-Tenant-Id')
-
-        meta = getattr(request, 'META', {})
-        ip_address = meta.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip() or meta.get('REMOTE_ADDR')
-        user_agent = meta.get('HTTP_USER_AGENT', '')
+        tenant_id = getattr(user, 'tenant_id', None) or (request.headers.get('X-Tenant-Id') if hasattr(request, 'headers') else None)
 
         clean_details = dict(details) if isinstance(details, dict) else {}
         for secret_key in ['password', 'token', 'secret', 'credit_card', 'cvv']:
             if secret_key in clean_details:
                 clean_details[secret_key] = '***REDACTED***'
 
-        payload = {
-            'tenant_id': str(tenant_id) if tenant_id and str(tenant_id) != 'None' else None,
-            'actor_id': str(actor_id) if actor_id and str(actor_id) != 'None' else None,
-            'actor_email': str(actor_email),
-            'actor_role': str(actor_role),
-            'action': action,
-            'resource_type': resource_type,
-            'resource_id': str(resource_id),
-            'status': status,
-            'ip_address': ip_address,
-            'user_agent': user_agent[:255] if user_agent else '',
-            'details': clean_details,
-            'changes': changes or {}
-        }
-
-        requests.post(target_url, json=payload, timeout=2)
+        creds = _get_channel_credentials()
+        options = [('grpc.ssl_target_name_override', 'catalog_service')] if creds else None
+        channel = grpc.secure_channel(IDENTITY_GRPC_HOST, creds, options=options) if creds else grpc.insecure_channel(IDENTITY_GRPC_HOST)
+        stub = IdentityServiceStub(channel)
+        stub.CreateAuditLog(AuditLogRequest(
+            service_name="inventory_service",
+            action=action,
+            user_id=str(actor_id or ''),
+            tenant_id=str(tenant_id or ''),
+            details=json.dumps(clean_details)
+        ), timeout=2)
     except Exception as e:
-        logger.warning(f"Failed to record audit log '{action}': {e}")
+        logger.warning(f"Failed to record audit log '{action}' via gRPC: {e}")
