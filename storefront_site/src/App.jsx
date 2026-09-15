@@ -23,6 +23,8 @@ import { OrderTrackingPage } from './pages/OrderTrackingPage';
 import { ChatPage } from './pages/ChatPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
 
+import { usePresence } from './hooks/usePresence';
+
 function ScrollToTop() {
   const { pathname, search } = useLocation();
 
@@ -33,10 +35,16 @@ function ScrollToTop() {
   return null;
 }
 
+function GlobalPresenceListener() {
+  usePresence();
+  return null;
+}
+
 export default function App() {
   return (
     <ToastProvider>
       <AuthProvider>
+        <GlobalPresenceListener />
         <NotificationProvider>
           <CartProvider>
             <BrowserRouter>

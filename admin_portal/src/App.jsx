@@ -24,6 +24,7 @@ import InvoicesPage from './pages/InvoicesPage';
 import NotificationsPage from './pages/NotificationsPage';
 import ItemRequestsPage from './pages/ItemRequestsPage';
 import { ChatPage } from './pages/ChatPage';
+import { usePresence } from './hooks/usePresence';
 
 const RoleRoute = ({ allowedRole, children }) => {
   const { isPlatformAdmin } = useContext(AuthContext);
@@ -62,6 +63,8 @@ const ProtectedLayout = ({ allowedRole, children }) => {
   const { token, loading } = useContext(AuthContext);
   const [collapsed, setCollapsed] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  usePresence();
 
   if (loading) return (
     <div className="min-h-screen bg-[#090d16] flex flex-col items-center justify-center text-slate-400 text-sm font-medium gap-3">

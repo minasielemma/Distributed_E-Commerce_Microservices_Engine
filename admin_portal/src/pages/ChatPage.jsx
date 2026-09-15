@@ -277,7 +277,11 @@ export const ChatPage = () => {
       };
       targetRoom.last_message_at = newMsg.created_at || new Date().toISOString();
 
-      if (String(rId) !== String(selectedId) && String(newMsg.sender_id) !== String(user?.id)) {
+      if (String(rId) === String(selectedId)) {
+        targetRoom.unread_count = 0;
+      } else if (typeof newMsg.unread_count === 'number') {
+        targetRoom.unread_count = newMsg.unread_count;
+      } else if (String(newMsg.sender_id) !== String(user?.id)) {
         targetRoom.unread_count = (targetRoom.unread_count || 0) + 1;
       }
 
@@ -336,30 +340,66 @@ export const ChatPage = () => {
 
     const handleRoomUpdated = (e) => {
       const data = e.detail;
-      if (data?.room_id && data?.last_message) {
-        updateRoomLastMessage(data.room_id, {
-          room: data.room_id,
-          room_id: data.room_id,
-          id: data.last_message.id,
-          content: data.last_message.content,
-          sender_name: data.last_message.sender_name,
-          sender_id: data.last_message.sender_id,
-          created_at: data.last_message.created_at || data.last_message_at,
-        });
+      if (data?.room_id) {
+        if (data.last_message) {
+          updateRoomLastMessage(data.room_id, {
+            room: data.room_id,
+            room_id: data.room_id,
+            id: data.last_message.id,
+            content: data.last_message.content,
+            sender_name: data.last_message.sender_name,
+            sender_id: data.last_message.sender_id,
+            created_at: data.last_message.created_at || data.last_message_at,
+            unread_count: data.unread_count,
+          });
+        } else if (typeof data.unread_count === 'number') {
+          const rId = extractRoomId(data.room_id);
+          setRooms((prevRooms) =>
+            prevRooms.map((r) => {
+              if (String(r.id) === String(rId)) {
+                return {
+                  ...r,
+                  unread_count: String(rId) === String(selectedId) ? 0 : data.unread_count,
+                };
+              }
+              return r;
+            })
+          );
+        }
       } else {
         fetchRooms();
+      }
+    };
+
+    const handleUnreadUpdated = (e) => {
+      const data = e.detail;
+      if (data?.room_id && typeof data.unread_count === 'number') {
+        const rId = extractRoomId(data.room_id);
+        setRooms((prevRooms) =>
+          prevRooms.map((r) => {
+            if (String(r.id) === String(rId)) {
+              return {
+                ...r,
+                unread_count: String(rId) === String(selectedId) ? 0 : data.unread_count,
+              };
+            }
+            return r;
+          })
+        );
       }
     };
 
     window.addEventListener('notification_received', handleNotif);
     window.addEventListener('chat_room_created', handleRoomCreated);
     window.addEventListener('chat_room_updated', handleRoomUpdated);
+    window.addEventListener('chat_unread_updated', handleUnreadUpdated);
     return () => {
       window.removeEventListener('notification_received', handleNotif);
       window.removeEventListener('chat_room_created', handleRoomCreated);
       window.removeEventListener('chat_room_updated', handleRoomUpdated);
+      window.removeEventListener('chat_unread_updated', handleUnreadUpdated);
     };
-  }, [updateRoomLastMessage, fetchRooms]);
+  }, [updateRoomLastMessage, fetchRooms, selectedId]);
 
   const messagesViewportRef = useRef(null);
   const scrollStateRef = useRef(null);

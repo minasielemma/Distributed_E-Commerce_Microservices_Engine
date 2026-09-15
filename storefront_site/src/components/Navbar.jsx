@@ -20,43 +20,28 @@ export const Navbar = () => {
     fetchTenants();
   }, []);
 
-  const fetchUnreadChatCount = useCallback(() => {
-    if (token) {
-      chatService.getUnreadCount()
-        .then((res) => setUnreadChatCount(res.data?.unread_count || 0))
-        .catch(() => {});
-    }
-  }, [token]);
-
   useEffect(() => {
-    fetchUnreadChatCount();
-
     const handleNotif = (e) => {
       const notif = e.detail;
-      if (notif?.notification_type === 'CHAT' || notif?.metadata?.room_id) {
-        fetchUnreadChatCount();
+      if (notif?.notification_type === 'CHAT') {
+        setUnreadChatCount((prev) => prev + 1);
       }
     };
 
     const handleUnreadUpdate = (e) => {
       if (typeof e?.detail?.total_unread_count === 'number') {
         setUnreadChatCount(e.detail.total_unread_count);
-      } else {
-        fetchUnreadChatCount();
       }
     };
 
     window.addEventListener('notification_received', handleNotif);
     window.addEventListener('chat_unread_updated', handleUnreadUpdate);
 
-    const interval = setInterval(fetchUnreadChatCount, 10000);
-
     return () => {
       window.removeEventListener('notification_received', handleNotif);
       window.removeEventListener('chat_unread_updated', handleUnreadUpdate);
-      clearInterval(interval);
     };
-  }, [token, fetchUnreadChatCount]);
+  }, [token]);
 
   // Close mobile drawer on route/search changes
   useEffect(() => {

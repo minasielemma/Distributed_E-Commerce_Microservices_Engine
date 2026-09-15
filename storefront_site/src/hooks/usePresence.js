@@ -11,6 +11,8 @@ export const usePresence = () => {
         ...prev,
         [user_id]: { status, last_seen },
       }));
+    } else if (evt.type === 'connection_established' && evt.data && typeof evt.data.total_unread_count === 'number') {
+      window.dispatchEvent(new CustomEvent('chat_unread_updated', { detail: evt.data }));
     } else if (evt.type === 'room_created' && evt.data) {
       window.dispatchEvent(new CustomEvent('chat_room_created', { detail: evt.data }));
       window.dispatchEvent(new CustomEvent('chat_unread_updated', { detail: evt.data }));

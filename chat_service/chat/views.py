@@ -97,6 +97,10 @@ def broadcast_room_ws(room_id, event_type, data):
 def get_user_total_unread_count(user_id):
     if not user_id:
         return 0
+    from .redis_unread import get_user_total_unread
+    cached = get_user_total_unread(user_id)
+    if cached is not None:
+        return cached
     from .models import ChatMessage, RoomParticipant
     room_ids = RoomParticipant.objects.filter(user_id=user_id).values_list('room_id', flat=True)
     return ChatMessage.objects.filter(
@@ -113,6 +117,10 @@ def get_user_total_unread_count(user_id):
 def get_user_room_unread_count(user_id, room_id):
     if not user_id or not room_id:
         return 0
+    from .redis_unread import get_user_room_unread
+    cached = get_user_room_unread(user_id, room_id)
+    if cached is not None:
+        return cached
     from .models import ChatMessage
     return ChatMessage.objects.filter(
         room_id=room_id,
@@ -144,9 +152,13 @@ def broadcast_user_update(user_id, event_type, data):
 def notify_room_participants_update(room, event_type='room_updated', msg=None):
     try:
         from .models import RoomParticipant
+        from .redis_unread import increment_user_unread
         participants = RoomParticipant.objects.filter(room=room)
         for p in participants:
             u_id = p.user_id
+            if msg and str(u_id) != str(msg.sender_id):
+                increment_user_unread(u_id, room.id, 1)
+
             room_unread = get_user_room_unread_count(u_id, room.id)
             total_unread = get_user_total_unread_count(u_id)
 
@@ -209,8 +221,8 @@ def auto_add_participants(room, creator_user_id, tenant_id=None, order_id=None, 
         except Exception as e:
             logger.warning(f"Failed to auto-add admins to support room {room.id}: {e}")
 
-    # 2. Handle Order-Related Chat Rooms (Auto-add Store Owner)
-    target_tenant_id = tenant_id
+    # 2. Handle Shop & Order-Related Chat Rooms (Auto-add Store Owner)
+    target_tenant_id = tenant_id or getattr(room, 'tenant_id', None)
     if not target_tenant_id and order_id:
         try:
             from chat.grpc_client import get_order_grpc
@@ -223,8 +235,7 @@ def auto_add_participants(room, creator_user_id, tenant_id=None, order_id=None, 
         except Exception as e:
             logger.warning(f"Failed to resolve order {order_id} tenant_id: {e}")
 
-    is_order_chat = (room_type == 'ORDER_SUPPORT' or order_id or target_tenant_id)
-    if is_order_chat and target_tenant_id:
+    if target_tenant_id:
         try:
             from chat.grpc_client import lookup_users_grpc
             owners = lookup_users_grpc(tenant_id=target_tenant_id)
@@ -242,9 +253,6 @@ def auto_add_participants(room, creator_user_id, tenant_id=None, order_id=None, 
                     )
                     if created:
                         added_names.append(getattr(own, 'email', '') or 'Store Owner')
-
-
-
         except Exception as e:
             logger.warning(f"Failed to auto-add store owner for tenant {target_tenant_id}: {e}")
 
@@ -691,17 +699,10 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
 
         message_ids = request.data.get('message_ids', [])
         affected_ids = update_recipient_statuses_for_user(room.id, user_id, 'READ', message_ids)
+        from .redis_unread import reset_user_room_unread
+        reset_user_room_unread(user_id, room.id)
 
-        room_ids = RoomParticipant.objects.filter(user_id=user_id).values_list('room_id', flat=True)
-        unread_count = ChatMessage.objects.filter(
-            room_id__in=room_ids,
-            is_deleted=False
-        ).exclude(
-            sender_id=user_id
-        ).exclude(
-            recipient_statuses__user_id=user_id,
-            recipient_statuses__status='READ'
-        ).count()
+        unread_count = get_user_total_unread_count(user_id)
 
         read_data = {
             'room_id': str(room.id),

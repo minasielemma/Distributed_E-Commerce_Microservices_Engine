@@ -383,6 +383,8 @@ class ChatRoomConsumer(AsyncJsonWebsocketConsumer):
         affected_ids = update_recipient_statuses_for_user(room_id, user_id, 'READ', message_ids)
         now = datetime.now(timezone.utc)
         try:
+            from .redis_unread import reset_user_room_unread
+            reset_user_room_unread(user_id, room_id)
             from .views import notify_room_participants_update
             room = ChatRoom.objects.get(id=room_id)
             notify_room_participants_update(room, event_type='unread_count_update', msg=None)
@@ -464,12 +466,23 @@ class UserUpdatesConsumer(AsyncJsonWebsocketConsumer):
         await database_sync_to_async(set_user_online)(user.id)
         await database_sync_to_async(broadcast_presence_event)(user.id, 'online')
 
+        from .views import get_user_total_unread_count
+        total_unread = await database_sync_to_async(get_user_total_unread_count)(user.id)
+
         await self.send_json({
             'type': 'connection_established',
             'status': 'authenticated',
             'data': {
                 'user_id': self.user_id,
-                'message': 'Connected to global updates & presence channel'
+                'message': 'Connected to global updates & presence channel',
+                'total_unread_count': total_unread
+            }
+        })
+
+        await self.send_json({
+            'type': 'unread_count_update',
+            'data': {
+                'total_unread_count': total_unread
             }
         })
 

@@ -14,36 +14,25 @@ export const Sidebar = ({ collapsed = false, setCollapsed, mobileOpen = false, s
 
   useEffect(() => {
     if (!isPlatformAdmin) {
-      const fetchUnread = () => {
-        chatService.getUnreadCount()
-          .then((res) => setUnreadCount(res.data?.unread_count || 0))
-          .catch(() => {});
-      };
-      fetchUnread();
-
       const handleNotif = (e) => {
         const notif = e.detail;
-        if (notif?.notification_type === 'CHAT' || notif?.metadata?.room_id) {
-          fetchUnread();
+        if (notif?.notification_type === 'CHAT') {
+          setUnreadCount((prev) => prev + 1);
         }
       };
 
       const handleUnreadUpdate = (e) => {
         if (typeof e?.detail?.total_unread_count === 'number') {
           setUnreadCount(e.detail.total_unread_count);
-        } else {
-          fetchUnread();
         }
       };
 
       window.addEventListener('notification_received', handleNotif);
       window.addEventListener('chat_unread_updated', handleUnreadUpdate);
 
-      const interval = setInterval(fetchUnread, 10000);
       return () => {
         window.removeEventListener('notification_received', handleNotif);
         window.removeEventListener('chat_unread_updated', handleUnreadUpdate);
-        clearInterval(interval);
       };
     }
   }, [isPlatformAdmin]);

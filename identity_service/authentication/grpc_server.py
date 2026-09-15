@@ -30,17 +30,29 @@ class IdentityServicer(IdentityServiceServicer):
             if request.user_id:
                 qs = qs.filter(id=request.user_id)
             if request.tenant_id:
-                qs = qs.filter(tenant_id=request.tenant_id)
+                from authentication.models.tenant import Tenant
+                from authentication.models.tenant_membership import TenantMembership
+                owner_ids = list(Tenant.objects.filter(id=request.tenant_id).values_list('owner_id', flat=True))
+                member_ids = list(TenantMembership.objects.filter(tenant_id=request.tenant_id, is_active=True).values_list('user_id', flat=True))
+                all_tenant_user_ids = list(set(owner_ids + member_ids))
+                qs = qs.filter(id__in=all_tenant_user_ids)
             if request.role:
                 qs = qs.filter(role=request.role)
 
             users_list = []
             for u in qs[:50]:
+                u_tenant_id = request.tenant_id or ""
+                if not u_tenant_id:
+                    t = getattr(u, 'tenants', None)
+                    if t:
+                        t_obj = t.first()
+                        if t_obj:
+                            u_tenant_id = str(t_obj.id)
                 users_list.append(UserData(
                     id=str(u.id),
                     email=u.email or "",
                     role=getattr(u, 'role', '') or '',
-                    tenant_id=str(getattr(u, 'tenant_id', '') or ''),
+                    tenant_id=str(u_tenant_id),
                     first_name=u.first_name or "",
                     last_name=u.last_name or ""
                 ))
