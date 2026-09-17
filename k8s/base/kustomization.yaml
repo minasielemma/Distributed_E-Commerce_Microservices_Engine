@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: microservices
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - network-policy.yaml
+  - nginx-configmap.yaml
+  - pdb.yaml
+
+
+  - pvc/databases-pvc.yaml
+  - pvc/app-pvc.yaml
+  - statefulsets/postgres-databases.yaml
+  - statefulsets/neo4j.yaml
+  - deployments/infrastructure.yaml
+  - deployments/microservices.yaml
+  - deployments/workers.yaml
+  - deployments/frontends.yaml
+  - deployments/gateway.yaml
+  - services/database-services.yaml
+  - services/infrastructure-services.yaml
+  - services/microservice-services.yaml
+  - services/frontend-services.yaml
+  - services/gateway-service.yaml
+  - ingress.yaml

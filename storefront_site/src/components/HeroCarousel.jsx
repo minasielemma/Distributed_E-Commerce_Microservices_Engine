@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { CountdownTimer } from './CountdownTimer';
 
 export const HeroCarousel = ({ products = [] }) => {
   const [current, setCurrent] = useState(0);
@@ -31,16 +32,54 @@ export const HeroCarousel = ({ products = [] }) => {
       >
         {validProducts.map((product, i) => {
           const imgUrl = product.images[0]?.image_url;
+          const baseP = parseFloat(product.base_price || product.price || 0);
+          const dynP = parseFloat(product.dynamic_price || baseP);
+          const activeDisc = product.active_discount || product.discounts?.[0];
+          const hasDiscount = dynP < baseP || Boolean(activeDisc);
+
+          let discountLabel = '';
+          if (activeDisc) {
+            const val = parseFloat(activeDisc.discount_value || 0);
+            if (activeDisc.discount_type === 'PERCENTAGE') {
+              discountLabel = `-${Math.round(val)}% OFF`;
+            } else if (activeDisc.discount_type === 'FIXED' || activeDisc.discount_type === 'FIXED_AMOUNT') {
+              discountLabel = `Save $${val.toFixed(2)}`;
+            }
+          } else if (dynP < baseP) {
+            discountLabel = `-${Math.round(((baseP - dynP) / baseP) * 100)}% OFF`;
+          }
+
           return (
             <div key={product.id} className="w-full flex-shrink-0 relative h-full flex items-center justify-center">
               {/* Product Layout for Banner */}
               <div className="flex flex-col md:flex-row items-center justify-center w-full max-w-6xl mx-auto px-8 sm:px-12 gap-4 sm:gap-6 md:gap-8 z-10 pt-4 pb-12 sm:pb-20 lg:pb-32">
                 <div className="flex-1 text-white space-y-2 sm:space-y-4 text-center md:text-left">
-                   <span className="bg-amazon-orange text-[#111] text-[10px] sm:text-xs font-bold px-2 py-0.5 sm:py-1 uppercase rounded-sm inline-block">
-                      Featured Deal
-                   </span>
+                   <div className="flex items-center gap-2 justify-center md:justify-start flex-wrap">
+                     <span className="bg-amazon-orange text-[#111] text-[10px] sm:text-xs font-bold px-2 py-0.5 sm:py-1 uppercase rounded-sm inline-block">
+                        Featured Deal
+                     </span>
+                     {discountLabel && (
+                       <span className="bg-[#CC0C39] text-white text-[10px] sm:text-xs font-bold px-2 py-0.5 sm:py-1 rounded-sm inline-block">
+                         {discountLabel}
+                       </span>
+                     )}
+                   </div>
+
                    <h2 className="text-xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold line-clamp-2">{product.name}</h2>
-                   <p className="text-base sm:text-lg md:text-xl text-gray-300 font-medium">${Number(product.base_price).toFixed(2)}</p>
+                   
+                   <div className="flex items-baseline gap-3 justify-center md:justify-start">
+                      <p className="text-xl sm:text-2xl md:text-3xl text-emerald-400 font-extrabold">${dynP.toFixed(2)}</p>
+                      {hasDiscount && baseP > dynP && (
+                        <p className="text-sm sm:text-base text-gray-400 line-through font-medium">${baseP.toFixed(2)}</p>
+                      )}
+                   </div>
+
+                   {activeDisc?.end_time && (
+                     <div className="pt-1">
+                       <CountdownTimer endTime={activeDisc.end_time} />
+                     </div>
+                   )}
+
                    <div>
                      <Link to={`/products/${product.id}`} className="bg-amazon-cta-secondary hover:bg-amazon-cta-secondaryHover text-[#0F1111] font-bold py-1.5 sm:py-2 px-4 sm:px-6 text-xs sm:text-sm rounded-full inline-block mt-1 sm:mt-2 shadow">
                         Shop Now

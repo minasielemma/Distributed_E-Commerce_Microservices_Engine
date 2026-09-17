@@ -4,7 +4,7 @@ import { getErrorMessage } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { usePagination } from '../hooks/usePagination';
 import { ControlPanel, DataTable, FormSheet, ConfirmDialog, EmptyState, LoadingSkeleton, Badge } from '../components/common/UIComponents';
-import { Percent, Plus, Edit2, Trash2, CheckCircle2, XCircle, Tag, Sparkles } from 'lucide-react';
+import { Percent, Plus, Edit2, Trash2, CheckCircle2, XCircle, Tag, Sparkles, X, Search } from 'lucide-react';
 
 const getInitialTimes = () => {
   const now = new Date();
@@ -14,6 +14,108 @@ const getInitialTimes = () => {
     end_time: nextMonth.toISOString().slice(0, 16)
   };
 };
+
+function ProductSearchPicker({ value, onChange, placeholder = "Search 100k+ products by name..." }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+
+  useEffect(() => {
+    if (value) {
+      if (!selectedProduct || String(selectedProduct.id) !== String(value)) {
+        catalogService.getProduct(value)
+          .then((r) => setSelectedProduct(r.data))
+          .catch(() => setSelectedProduct(null));
+      }
+    } else {
+      setSelectedProduct(null);
+    }
+  }, [value]);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    const timer = setTimeout(() => {
+      catalogService.getProducts({ search: query.trim(), page_size: 20 })
+        .then((r) => {
+          const list = Array.isArray(r.data) ? r.data : (r.data?.results || []);
+          setResults(list);
+        })
+        .catch(() => setResults([]))
+        .finally(() => setLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, open]);
+
+  return (
+    <div className="relative">
+      {selectedProduct ? (
+        <div className="flex items-center justify-between p-2.5 bg-slate-800/90 border border-purple-500/50 rounded-lg text-xs">
+          <div className="flex items-center gap-2 truncate">
+            <Tag className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <span className="font-bold text-white truncate">{selectedProduct.name}</span>
+            <span className="text-emerald-400 font-mono">(Base: ${selectedProduct.base_price})</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedProduct(null);
+              onChange('');
+            }}
+            className="text-slate-400 hover:text-rose-400 p-1"
+            title="Clear product selection"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div className="relative">
+            <input
+              type="text"
+              value={query}
+              onFocus={() => setOpen(true)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setOpen(true);
+              }}
+              placeholder={placeholder}
+              className="app-input pr-8"
+            />
+            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+          </div>
+          {open && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-800">
+              {loading ? (
+                <div className="p-3 text-xs text-slate-400 text-center">Searching catalog products...</div>
+              ) : results.length === 0 ? (
+                <div className="p-3 text-xs text-slate-400 text-center">No products found matching "{query}"</div>
+              ) : (
+                results.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedProduct(p);
+                      onChange(p.id);
+                      setOpen(false);
+                    }}
+                    className="w-full text-left p-2.5 hover:bg-purple-600/20 text-xs flex items-center justify-between transition-colors"
+                  >
+                    <span className="font-semibold text-slate-200 truncate pr-2">{p.name}</span>
+                    <span className="text-emerald-400 font-mono text-[11px] shrink-0">${p.base_price}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function DiscountsPage() {
   const [discounts, setDiscounts] = useState([]);
@@ -66,10 +168,6 @@ export default function DiscountsPage() {
   }, [fetchDiscounts]);
 
   useEffect(() => {
-    catalogService.getProducts({ page_size: 1000 })
-      .then((r) => setProducts(Array.isArray(r.data) ? r.data : r.data.results || []))
-      .catch(() => {});
-
     catalogService.getCategories({ fetch_all: true })
       .then((r) => setCategories(Array.isArray(r.data) ? r.data : r.data.results || []))
       .catch(() => {});
@@ -199,12 +297,12 @@ export default function DiscountsPage() {
       header: 'Target (Product / Category)',
       accessor: 'target',
       render: (row) => {
-        const productName = row.product ? products.find((p) => String(p.id) === String(row.product))?.name : null;
-        const categoryName = row.category ? categories.find((c) => String(c.id) === String(row.category))?.name : null;
+        const productName = row.product_detail?.name || (row.product ? `Product ID: ${row.product}` : null);
+        const categoryName = row.category_detail?.name || (row.category ? categories.find((c) => String(c.id) === String(row.category))?.name : null);
         if (productName) {
           return (
             <span className="bg-purple-500/10 border border-purple-500/30 text-purple-300 px-2.5 py-1 rounded-md text-xs inline-flex items-center gap-1">
-              <Tag className="w-3 h-3 text-purple-400" /> Product: {productName}
+              <Tag className="w-3 h-3 text-purple-400" /> {productName}
             </span>
           );
         }
@@ -378,17 +476,10 @@ export default function DiscountsPage() {
             </div>
 
             {formData.target_type === 'PRODUCT' ? (
-              <select
+              <ProductSearchPicker
                 value={formData.product}
-                onChange={(e) => field('product', e.target.value)}
-                required
-                className="app-input"
-              >
-                <option value="">— Select target product —</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} (Base: ${p.base_price})</option>
-                ))}
-              </select>
+                onChange={(pId) => field('product', pId)}
+              />
             ) : (
               <select
                 value={formData.category}
@@ -463,4 +554,5 @@ export default function DiscountsPage() {
     </div>
   );
 }
+
 

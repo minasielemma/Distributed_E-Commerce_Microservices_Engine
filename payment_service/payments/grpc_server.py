@@ -11,7 +11,7 @@ django.setup()
 
 from decimal import Decimal
 from payments.models import Payment
-from payments.polar_provider import PolarPaymentProvider
+from payments.polar_provider import PolarPaymentProvider, get_polar_checkout_base_url
 from payments.payment_pb2 import (
     CheckoutResponse
 )
@@ -57,7 +57,8 @@ class PaymentServicer(PaymentServiceServicer):
                     import logging
                     logging.getLogger(__name__).warning(f"Could not create Polar checkout session in gRPC: {polar_err}")
 
-            checkout_url = payment.polar_checkout_url or f"http://localhost:8000/api/payments/checkout/polar/{payment.id}/"
+            checkout_base = get_polar_checkout_base_url()
+            checkout_url = payment.polar_checkout_url or f"{checkout_base}/polar_chk_{payment.id}"
             return CheckoutResponse(
                 success=True,
                 checkout_url=checkout_url,

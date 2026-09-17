@@ -7,10 +7,10 @@ python manage.py migrate --noinput
 
 if [ "$SERVICE_TYPE" = "celery_worker" ]; then
     echo "[Order Service] Starting Celery Worker..."
-    exec celery -A order_project worker -l info
+    exec celery -A order_project worker -l info --concurrency=2
 elif [ "$SERVICE_TYPE" = "celery_beat" ]; then
     echo "[Order Service] Starting Celery Beat..."
-    exec celery -A order_project beat -l info
+    exec celery -A order_project beat -l info -s /tmp/celerybeat-schedule
 elif [ "$SERVICE_TYPE" = "kafka_consumer" ]; then
     echo "[Order Service] Starting Kafka Event Consumer..."
     exec python manage.py consume_kafka_events

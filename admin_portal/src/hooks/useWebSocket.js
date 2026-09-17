@@ -42,14 +42,7 @@ export const useWebSocket = (url, options = {}) => {
           sessionStorage.getItem('access_token') ||
           sessionStorage.getItem('token');
 
-        let host = window.location.host;
-        if (
-          window.location.port &&
-          window.location.port !== '80' &&
-          window.location.port !== '443'
-        ) {
-          host = window.location.hostname;
-        }
+        const host = window.location.host;
 
         const wsUrl =
           url.startsWith('ws://') || url.startsWith('wss://')

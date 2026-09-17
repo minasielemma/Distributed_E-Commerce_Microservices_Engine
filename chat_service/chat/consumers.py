@@ -248,6 +248,7 @@ class ChatRoomConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def check_participant_access(self, room_id, user):
         from .models import RoomParticipant, ChatRoom
+        from .views import ensure_room_participants, auto_add_participants
         user_id = getattr(user, 'id', None)
         if not user_id:
             return False
@@ -255,6 +256,14 @@ class ChatRoomConsumer(AsyncJsonWebsocketConsumer):
         is_participant = RoomParticipant.objects.filter(room_id=room_id, user_id=user_id).exists()
         if is_participant:
             return True
+
+        try:
+            room = ChatRoom.objects.get(id=room_id)
+            ensure_room_participants(room)
+            if RoomParticipant.objects.filter(room_id=room_id, user_id=user_id).exists():
+                return True
+        except Exception:
+            pass
 
         user_role = str(getattr(user, 'role', '')).upper()
         is_platform_admin = (
@@ -292,6 +301,26 @@ class ChatRoomConsumer(AsyncJsonWebsocketConsumer):
                     return True
             except Exception:
                 pass
+
+        # Check order customer access
+        try:
+            room = ChatRoom.objects.get(id=room_id)
+            if room.order_id:
+                from chat.grpc_client import get_order_grpc
+                o_res = get_order_grpc(room.order_id)
+                if o_res and o_res.found and o_res.customer_id and str(o_res.customer_id) == str(user_id):
+                    RoomParticipant.objects.get_or_create(
+                        room=room,
+                        user_id=user_id,
+                        defaults={
+                            'user_name': getattr(user, 'username', 'Customer'),
+                            'user_role': user_role or 'CUSTOMER',
+                            'role': 'MEMBER'
+                        }
+                    )
+                    return True
+        except Exception:
+            pass
 
         return False
 

@@ -17,9 +17,9 @@ export const authService = {
   deleteAddress: (id) => api.delete(`/auth/addresses/${id}/`),
   
   // Notifications
-  getNotifications: (params = {}) => api.get('/auth/notifications/', { params }).catch(() => api.get('/notifications/', { params })),
-  markNotificationRead: (id) => api.post(`/auth/notifications/${id}/read/`).catch(() => api.post(`/notifications/${id}/mark_read/`)),
-  deleteNotification: (id) => api.delete(`/auth/notifications/${id}/`).catch(() => api.delete(`/notifications/${id}/`)),
+  getNotifications: (params = {}) => api.get('/notifications/', { params }),
+  markNotificationRead: (id) => api.post(`/notifications/${id}/mark_read/`),
+  deleteNotification: (id) => api.delete(`/notifications/${id}/`),
 
   // Activity Logs
   getActivityLogs: (params = {}) => api.get('/auth/activity/', { params }),
@@ -31,14 +31,11 @@ export const authService = {
 };
 
 export const notificationService = {
-  getNotifications: (params = {}) => api.get('/auth/notifications/', { params }).catch(() => api.get('/notifications/', { params })),
-  markNotificationRead: (id) => api.post(`/auth/notifications/${id}/read/`).catch(() => api.post(`/notifications/${id}/mark_read/`)),
-  markAllRead: () => api.post('/auth/notifications/mark_all_read/').catch(() => api.post('/notifications/mark_all_read/')),
-  getUnreadCount: (params = {}) => api.get('/auth/notifications/', { params }).then(res => {
-    const list = Array.isArray(res.data) ? res.data : (res.data?.results || []);
-    return { data: { unread_count: list.filter(n => !n.is_read).length } };
-  }).catch(() => api.get('/notifications/unread_count/')),
-  deleteNotification: (id) => api.delete(`/auth/notifications/${id}/`).catch(() => api.delete(`/notifications/${id}/`)),
+  getNotifications: (params = {}) => api.get('/notifications/', { params }),
+  markNotificationRead: (id) => api.post(`/notifications/${id}/mark_read/`),
+  markAllRead: () => api.post('/notifications/mark_all_read/'),
+  getUnreadCount: (params = {}) => api.get('/notifications/unread_count/'),
+  deleteNotification: (id) => api.delete(`/notifications/${id}/`),
 };
 
 // --- CATALOG SERVICE ---

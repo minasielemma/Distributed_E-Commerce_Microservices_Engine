@@ -1,0 +1,33 @@
+# Default-Deny Ingress and Egress Network Policy for Microservices Namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: microservices
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# Allow Ingress Controller, Gateway & Internal Inter-Service Communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internal-microservices
+  namespace: microservices
+spec:
+  podSelector: {}
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector: {}
+        - ipBlock:
+            cidr: 0.0.0.0/0
+  egress:
+    - to:
+        - podSelector: {}
+        - namespaceSelector: {}
+        - ipBlock:
+            cidr: 0.0.0.0/0

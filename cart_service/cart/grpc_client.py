@@ -5,8 +5,8 @@ from cart.catalog_pb2_grpc import ProductServiceStub
 from cart.identity_pb2 import NotificationRequest
 from cart.identity_pb2_grpc import IdentityServiceStub
 
-CATALOG_GRPC_HOST = os.getenv('CATALOG_GRPC_HOST', 'catalog_service:50051')
-IDENTITY_GRPC_HOST = os.getenv('IDENTITY_GRPC_HOST', 'identity_service:50053')
+CATALOG_GRPC_HOST = os.getenv('CATALOG_GRPC_HOST', 'catalog-service:50051')
+IDENTITY_GRPC_HOST = os.getenv('IDENTITY_GRPC_HOST', 'identity-service:50053')
 KEYS_DIR = os.getenv('KEYS_DIR', '/shared_keys')
 
 
@@ -30,7 +30,8 @@ def _get_channel_credentials():
 def _get_channel(host):
     creds = _get_channel_credentials()
     if creds:
-        options = [('grpc.ssl_target_name_override', 'catalog_service')]
+        target_name = host.split(':')[0].replace('-', '_')
+        options = [('grpc.ssl_target_name_override', target_name)]
         return grpc.secure_channel(host, creds, options=options)
     return grpc.insecure_channel(host)
 

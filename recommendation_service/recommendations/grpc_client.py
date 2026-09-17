@@ -27,7 +27,8 @@ def _get_channel_credentials():
 def _get_channel(host):
     creds = _get_channel_credentials()
     if creds:
-        options = [('grpc.ssl_target_name_override', 'catalog_service')]
+        target_name = host.split(':')[0].replace('-', '_')
+        options = [('grpc.ssl_target_name_override', target_name)]
         return grpc.secure_channel(host, creds, options=options)
     return grpc.insecure_channel(host)
 

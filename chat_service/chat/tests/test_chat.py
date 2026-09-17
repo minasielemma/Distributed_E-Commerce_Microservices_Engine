@@ -217,10 +217,12 @@ class AutoAddParticipantsTests(TestCase):
 
     @patch('chat.grpc_client.get_order_grpc')
     @patch('chat.grpc_client.lookup_users_grpc')
-    def test_auto_add_store_owner_with_order_id(self, mock_lookup, mock_order):
+    def test_auto_add_store_owner_and_customer_with_order_id(self, mock_lookup, mock_order):
+        customer_id = uuid.uuid4()
         mock_ord = MagicMock()
         mock_ord.found = True
         mock_ord.tenant_id = str(self.tenant_id)
+        mock_ord.customer_id = str(customer_id)
         mock_order.return_value = mock_ord
 
         mock_user = MagicMock()
@@ -240,6 +242,7 @@ class AutoAddParticipantsTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         room_id = response.data['id']
         self.assertTrue(RoomParticipant.objects.filter(room_id=room_id, user_id=self.store_owner_id).exists())
+        self.assertTrue(RoomParticipant.objects.filter(room_id=room_id, user_id=customer_id).exists())
 
 
     @patch('chat.views.broadcast_room_ws')

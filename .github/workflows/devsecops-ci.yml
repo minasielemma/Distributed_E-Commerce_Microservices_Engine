@@ -1,0 +1,81 @@
+name: DevSecOps Security Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  secrets-audit:
+    name: Secrets Audit (TruffleHog & Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog OSS Secret Scan
+        uses: trufflesecurity/trufflehog-actions-scan@v3.88.2
+        with:
+          extra_args: --debug --only-verified
+
+  lint-and-iac-scan:
+    name: Lint & IaC Security Scan (Hadolint, Kubeconform, Checkov)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Hadolint on Dockerfiles
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          recursive: true
+          failure-threshold: error
+
+      - name: Run Checkov IaC Security Scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          framework: kubernetes,dockerfile
+          output_format: cli
+          soft_fail: false
+
+  sast-and-sca-scan:
+    name: SAST & Dependency SCA Audit (Trivy & Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy Repository Vulnerability Scan
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          ignore-unfixed: true
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+
+  container-build-and-scan:
+    name: Container Build & Vulnerability Scan
+    runs-on: ubuntu-latest
+    needs: [secrets-audit, lint-and-iac-scan]
+    strategy:
+      matrix:
+        service: [gateway, identity_service, catalog_service, order_service, payment_service, cart_service]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Container Image
+        run: |
+          docker build -t microservice-${{ matrix.service }}:${{ github.sha }} ./${{ matrix.service }}
+
+      - name: Scan Built Image with Trivy
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          image-ref: 'microservice-${{ matrix.service }}:${{ github.sha }}'
+          format: 'table'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'

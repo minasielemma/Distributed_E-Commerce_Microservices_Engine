@@ -1,8 +1,7 @@
-from drf_yasg import openapi
-from drf_yasg.utils import swagger_auto_schema
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, viewsets, mixins, permissions
 from django.core.exceptions import FieldDoesNotExist
 from django.db.models import ForeignKey, QuerySet
-from rest_framework import viewsets, mixins, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -72,32 +71,17 @@ class BaseModelViewSet(viewsets.GenericViewSet):
         return queryset
 
 class MultipleDeleteViewSet(viewsets.GenericViewSet):
-    @swagger_auto_schema(
-        method="post",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            title="Multiple delete.",
-            properties={
-                "ids": openapi.Schema(
-                    type=openapi.TYPE_ARRAY,
-                    items=openapi.Schema(
-                        type=openapi.TYPE_INTEGER,
-                    ),
-                ),
-            },
-            required=["ids"],
+    @extend_schema(
+        request=inline_serializer(
+            name='MultipleDeleteRequest',
+            fields={'ids': serializers.ListField(child=serializers.IntegerField())}
         ),
         responses={
-            200: openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    "detail": openapi.Schema(
-                        type=openapi.TYPE_STRING,
-                        title="Successfully deleted.",
-                    ),
-                },
-            ),
-        },
+            200: inline_serializer(
+                name='MultipleDeleteResponse',
+                fields={'detail': serializers.CharField()}
+            )
+        }
     )
     @action(
         methods=["post"],

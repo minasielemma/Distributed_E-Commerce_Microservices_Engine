@@ -113,6 +113,98 @@ docker compose down
 
 ---
 
+## ☸️ Running on Kubernetes (Minikube & Production K8s)
+
+The platform is equipped with production-grade Kustomize manifests for running on **Minikube**, **Kind**, **MicroK8s**, or cloud Kubernetes services (**GKE**, **EKS**, **AKS**).
+
+### Prerequisites for Kubernetes
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Minikube](https://minikube.sigs.k8s.io/docs/start/) (for local cluster execution) or access to a Kubernetes cluster.
+
+---
+
+### Step 1: Build Frontend Assets
+
+Compile production frontend static bundles before building container images:
+
+```bash
+cd storefront_site && npm run build && cd ..
+cd admin_portal && npm run build && cd ..
+```
+
+---
+
+### Step 2: Build Container Images
+
+#### A. Running on Minikube (Local Cluster)
+Build images directly inside Minikube's Docker daemon:
+
+```bash
+minikube image build -t micro_service-storefront_site:latest storefront_site
+minikube image build -t micro_service-admin_portal:latest admin_portal
+minikube image build -t micro_service-notification_service:latest notification_service
+minikube image build -t micro_service-order_service_worker:latest order_service
+```
+
+#### B. Running on Standard Kubernetes (GKE / EKS / AKS / Cloud)
+Build and push images to your Docker registry:
+
+```bash
+docker build -t <your-registry>/micro_service-storefront_site:latest storefront_site
+docker push <your-registry>/micro_service-storefront_site:latest
+
+docker build -t <your-registry>/micro_service-admin_portal:latest admin_portal
+docker push <your-registry>/micro_service-admin_portal:latest
+```
+
+---
+
+### Step 3: Deploy via Kustomize
+
+#### Deploy to Minikube:
+```bash
+kubectl apply -k k8s/overlays/minikube
+```
+
+#### Deploy to Production Cluster:
+```bash
+kubectl apply -k k8s/overlays/production
+```
+
+---
+
+### Step 4: Verification & Operations
+
+Check pod status in the `microservices` namespace:
+
+```bash
+kubectl get pods -n microservices
+```
+
+Rollout restart all deployments after code or image updates:
+
+```bash
+kubectl rollout restart deployment -n microservices
+```
+
+Inspect worker and Kafka consumer logs:
+
+```bash
+# Order Service Outbox Worker Logs
+kubectl logs -n microservices -l app=order-service-worker --tail=50
+
+# Notification Kafka Consumer Logs
+kubectl logs -n microservices -l app=notification-service-kafka-consumer --tail=50
+```
+
+Verify persistent database contents (e.g. `notification-db`):
+
+```bash
+kubectl exec -n microservices notification-db-0 -- psql -U notification_user -d notification_db -c "SELECT id, user_id, notification_type, title, is_read, created_at FROM notifications_notification ORDER BY created_at DESC LIMIT 10;"
+```
+
+---
+
 ## 🧪 Testing Suite & Resilience Verification
 
 The platform includes unit, integration, and high-concurrency resilience test suites across all 11 microservices (**176 tests** total).

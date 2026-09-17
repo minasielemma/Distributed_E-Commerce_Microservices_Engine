@@ -27,16 +27,16 @@ class FinanceServicer(FinanceServiceServicer):
         payment_method = request.payment_method or 'CARD'
 
         try:
-            entry = record_payment_ledger_and_invoice(
-                tenant_id=tenant_id,
+            entry, invoice, ledger_entry = record_payment_ledger_and_invoice(
                 order_id=order_id,
-                payment_id=payment_id,
-                amount=amount,
-                payment_method=payment_method
+                customer_id=payment_id or "customer_anon",
+                tenant_id=tenant_id,
+                total_amount=amount
             )
+            entry_id = str(entry.id) if entry and hasattr(entry, 'id') else (str(invoice.id) if invoice else "")
             return RecordPaymentResponse(
                 success=True,
-                entry_id=str(entry.id) if entry else "",
+                entry_id=entry_id,
                 error_message=""
             )
         except Exception as e:

@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: microservices
+data:
+  SECRET_KEY: "django-insecure-e-commerce-microservices-super-secret-key-change-in-production"
+  KEYS_DIR: "/shared_keys"
+  ALLOWED_HOSTS: "*"
+  DEBUG: "True"
+  CORS_ALLOW_ALL_ORIGINS: "True"
+  POSTGRES_PORT: "5432"
+  
+  # Identity DB
+  IDENTITY_POSTGRES_DB: "identity_db"
+  IDENTITY_POSTGRES_USER: "identity_user"
+  IDENTITY_POSTGRES_HOST: "identity-db"
+  IDENTITY_POSTGRES_PORT: "5432"
+  
+  # Catalog DB
+  CATALOG_POSTGRES_DB: "catalog_db"
+  CATALOG_POSTGRES_USER: "catalog_user"
+  CATALOG_POSTGRES_HOST: "catalog-db"
+  CATALOG_POSTGRES_PORT: "5432"
+  
+  # Order DB
+  ORDER_POSTGRES_DB: "order_db"
+  ORDER_POSTGRES_USER: "order_user"
+  ORDER_POSTGRES_HOST: "order-db"
+  ORDER_POSTGRES_PORT: "5432"
+
+  # Payment DB
+  PAYMENT_POSTGRES_DB: "payment_db"
+  PAYMENT_POSTGRES_USER: "payment_user"
+  PAYMENT_POSTGRES_HOST: "payment-db"
+  PAYMENT_POSTGRES_PORT: "5432"
+
+  # Inventory DB
+  INVENTORY_POSTGRES_DB: "inventory_db"
+  INVENTORY_POSTGRES_USER: "inventory_user"
+  INVENTORY_POSTGRES_HOST: "inventory-db"
+  INVENTORY_POSTGRES_PORT: "5432"
+
+  # Finance DB
+  FINANCE_POSTGRES_DB: "finance_db"
+  FINANCE_POSTGRES_USER: "finance_user"
+  FINANCE_POSTGRES_HOST: "finance-db"
+  FINANCE_POSTGRES_PORT: "5432"
+
+  # Cart DB
+  CART_POSTGRES_DB: "cart_db"
+  CART_POSTGRES_USER: "cart_user"
+  CART_POSTGRES_HOST: "cart-db"
+  CART_POSTGRES_PORT: "5432"
+
+  # Media DB
+  MEDIA_POSTGRES_DB: "media_db"
+  MEDIA_POSTGRES_USER: "media_user"
+  MEDIA_POSTGRES_HOST: "media-db"
+  MEDIA_POSTGRES_PORT: "5432"
+
+  # Chat DB
+  CHAT_POSTGRES_DB: "chat_db"
+  CHAT_POSTGRES_USER: "chat_user"
+  CHAT_POSTGRES_HOST: "chat-db"
+  CHAT_POSTGRES_PORT: "5432"
+
+  # Recommendation DB
+  RECOMMENDATION_POSTGRES_DB: "recommendation_db"
+  RECOMMENDATION_POSTGRES_USER: "recommendation_user"
+  RECOMMENDATION_POSTGRES_HOST: "recommendation-db"
+  RECOMMENDATION_POSTGRES_PORT: "5432"
+
+  # Notification DB
+  NOTIFICATION_POSTGRES_DB: "notification_db"
+  NOTIFICATION_POSTGRES_USER: "notification_user"
+  NOTIFICATION_POSTGRES_HOST: "notification-db"
+  NOTIFICATION_POSTGRES_PORT: "5432"
+
+  # Service Discovery & Inter-Service Communication (gRPC & REST)
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  REDIS_URL: "redis://redis:6379/0"
+
+  CATALOG_GRPC_HOST: "catalog-service:50051"
+  INVENTORY_GRPC_HOST: "inventory-service:50052"
+  IDENTITY_GRPC_HOST: "identity-service:50053"
+  ORDER_GRPC_HOST: "order-service:50054"
+  PAYMENT_GRPC_HOST: "payment-service:50055"
+  FINANCE_GRPC_HOST: "finance-service:50056"
+  CART_GRPC_HOST: "cart-service:50057"
+  MEDIA_GRPC_HOST: "media-service:50058"
+
+  IDENTITY_SERVICE_URL: "http://identity-service:8000"
+  CATALOG_SERVICE_URL: "http://catalog-service:8000"
+  ORDER_SERVICE_URL: "http://order-service:8000"
+  PAYMENT_SERVICE_URL: "http://payment-service:8000"
+  INVENTORY_SERVICE_URL: "http://inventory-service:8000"
+  FINANCE_SERVICE_URL: "http://finance-service:8000"
+  CART_SERVICE_URL: "http://cart-service:8000"
+  MEDIA_SERVICE_URL: "http://media-service:8000"
+  CHAT_SERVICE_URL: "http://chat-service:8000"
+  RECOMMENDATION_SERVICE_URL: "http://recommendation-service:8000"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:8000"
+
+  NEO4J_URI: "bolt://neo4j:7687"
+  NEO4J_USER: "neo4j"
+  MEDIA_ROOT: "/app/uploads"
+  MEDIA_URL: "/uploads/"
+
+  # Polar Payment Gateway Configuration
+  POLAR_ENVIRONMENT: "sandbox"
+  POLAR_API_BASE_URL: "https://sandbox-api.polar.sh/v1"
+  POLAR_CHECKOUT_BASE_URL: "https://sandbox.polar.sh/checkout"
+
+  # Default Django Admin
+  DJANGO_SUPERUSER_USERNAME: "admin"
+  DJANGO_SUPERUSER_EMAIL: "admin@admin.com"

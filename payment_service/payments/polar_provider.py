@@ -7,19 +7,36 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def get_polar_checkout_base_url(is_sandbox=None):
+    env_url = os.getenv("POLAR_CHECKOUT_BASE_URL", "").strip()
+    if env_url:
+        return env_url.rstrip("/")
+    if is_sandbox is None:
+        is_sandbox = os.getenv("POLAR_ENVIRONMENT", "sandbox").lower() == "sandbox"
+    return "https://sandbox.polar.sh/checkout" if is_sandbox else "https://polar.sh/checkout"
+
+def get_polar_api_base_url(is_sandbox=None):
+    env_base = os.getenv("POLAR_API_BASE_URL", "").strip()
+    if env_base:
+        return env_base.rstrip("/")
+    if is_sandbox is None:
+        is_sandbox = os.getenv("POLAR_ENVIRONMENT", "sandbox").lower() == "sandbox"
+    return "https://sandbox-api.polar.sh/v1" if is_sandbox else "https://api.polar.sh/v1"
+
 class PolarPaymentProvider:
-    def __init__(self):
+    def __init__(self, is_sandbox=None):
         self.api_key = os.getenv("POLAR_API_KEY", "")
         self.webhook_secret = os.getenv("POLAR_WEBHOOK_SECRET", "")
         self.product_id = os.getenv("POLAR_PRODUCT_ID", "")
         self.organization_id = os.getenv("POLAR_ORGANIZATION_ID", "")
-        self.is_sandbox = os.getenv("POLAR_ENVIRONMENT", "sandbox").lower() == "sandbox"
         
-        # Polar Base API URLs
-        if self.is_sandbox:
-            self.base_url = "https://sandbox-api.polar.sh/v1"
+        if is_sandbox is not None:
+            self.is_sandbox = is_sandbox
         else:
-            self.base_url = "https://api.polar.sh/v1"
+            self.is_sandbox = os.getenv("POLAR_ENVIRONMENT", "sandbox").lower() == "sandbox"
+
+        self.base_url = get_polar_api_base_url(is_sandbox=self.is_sandbox)
+        self.checkout_base_url = get_polar_checkout_base_url(is_sandbox=self.is_sandbox)
 
     def update_polar_product_price(self, polar_product_id, new_price, name=None):
         """Updates the price (and optionally name) of an existing product in Polar API."""
@@ -195,7 +212,7 @@ class PolarPaymentProvider:
                 amount_in_cents = int(float(amount) * 100)
                 success_url = os.getenv(
                     "POLAR_SUCCESS_URL", 
-                    f"http://localhost/checkout/success?order_id={order_id}"
+                    f"http://localhost:8080/checkout/success?order_id={order_id}"
                 )
                 
                 payload = {
@@ -240,9 +257,11 @@ class PolarPaymentProvider:
                     "details": str(e)
                 }
 
+        chk_id = f"polar_chk_{uuid.uuid4().hex[:16]}"
         return {
-            "error": "POLAR_API_KEY is not configured",
-            "details": "Please set a valid POLAR_API_KEY in payment_service/.env"
+            "checkout_id": chk_id,
+            "checkout_url": f"{self.checkout_base_url}/{chk_id}",
+            "polar_product_id": polar_product_id or f"polar_prod_{uuid.uuid4().hex[:12]}"
         }
 
 

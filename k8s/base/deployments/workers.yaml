@@ -1,0 +1,433 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service-worker
+  namespace: microservices
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-service-worker
+  template:
+    metadata:
+      labels:
+        app: order-service-worker
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: worker
+          image: micro_service-order_service_worker:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: SERVICE_TYPE
+              value: "celery_worker"
+            - name: POSTGRES_HOST
+              value: "order-db"
+            - name: POSTGRES_DB
+              value: "order_db"
+            - name: POSTGRES_USER
+              value: "order_user"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: ORDER_POSTGRES_PASSWORD
+          volumeMounts:
+            - name: shared-keys
+              mountPath: /shared_keys
+      volumes:
+        - name: shared-keys
+          persistentVolumeClaim:
+            claimName: shared-keys-pvc
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service-beat
+  namespace: microservices
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-service-beat
+  template:
+    metadata:
+      labels:
+        app: order-service-beat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: beat
+          image: micro_service-order_service_beat:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: SERVICE_TYPE
+              value: "celery_beat"
+            - name: POSTGRES_HOST
+              value: "order-db"
+            - name: POSTGRES_DB
+              value: "order_db"
+            - name: POSTGRES_USER
+              value: "order_user"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: ORDER_POSTGRES_PASSWORD
+          volumeMounts:
+            - name: shared-keys
+              mountPath: /shared_keys
+      volumes:
+        - name: shared-keys
+          persistentVolumeClaim:
+            claimName: shared-keys-pvc
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service-kafka-consumer
+  namespace: microservices
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-service-kafka-consumer
+  template:
+    metadata:
+      labels:
+        app: order-service-kafka-consumer
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: consumer
+          image: micro_service-order_service_kafka_consumer:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: SERVICE_TYPE
+              value: "kafka_consumer"
+            - name: POSTGRES_HOST
+              value: "order-db"
+            - name: POSTGRES_DB
+              value: "order_db"
+            - name: POSTGRES_USER
+              value: "order_user"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: ORDER_POSTGRES_PASSWORD
+          volumeMounts:
+            - name: shared-keys
+              mountPath: /shared_keys
+      volumes:
+        - name: shared-keys
+          persistentVolumeClaim:
+            claimName: shared-keys-pvc
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service-kafka-consumer
+  namespace: microservices
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service-kafka-consumer
+  template:
+    metadata:
+      labels:
+        app: payment-service-kafka-consumer
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: consumer
+          image: micro_service-payment_service:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: SERVICE_TYPE
+              value: "kafka_consumer"
+            - name: POSTGRES_HOST
+              value: "payment-db"
+            - name: POSTGRES_DB
+              value: "payment_db"
+            - name: POSTGRES_USER
+              value: "payment_user"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: PAYMENT_POSTGRES_PASSWORD
+          volumeMounts:
+            - name: shared-keys
+              mountPath: /shared_keys
+      volumes:
+        - name: shared-keys
+          persistentVolumeClaim:
+            claimName: shared-keys-pvc
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finance-service-kafka-consumer
+  namespace: microservices
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: finance-service-kafka-consumer
+  template:
+    metadata:
+      labels:
+        app: finance-service-kafka-consumer
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: consumer
+          image: micro_service-finance_service_kafka_consumer:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: SERVICE_TYPE
+              value: "kafka_consumer"
+            - name: POSTGRES_HOST
+              value: "finance-db"
+            - name: POSTGRES_DB
+              value: "finance_db"
+            - name: POSTGRES_USER
+              value: "finance_user"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: FINANCE_POSTGRES_PASSWORD
+          volumeMounts:
+            - name: shared-keys
+              mountPath: /shared_keys
+      volumes:
+        - name: shared-keys
+          persistentVolumeClaim:
+            claimName: shared-keys-pvc
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommendation-service-kafka-consumer
+  namespace: microservices
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recommendation-service-kafka-consumer
+  template:
+    metadata:
+      labels:
+        app: recommendation-service-kafka-consumer
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: consumer
+          image: micro_service-recommendation_service_kafka_consumer:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: SERVICE_TYPE
+              value: "kafka_consumer"
+            - name: POSTGRES_HOST
+              value: "recommendation-db"
+            - name: POSTGRES_DB
+              value: "recommendation_db"
+            - name: POSTGRES_USER
+              value: "recommendation_user"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: RECOMMENDATION_POSTGRES_PASSWORD
+          volumeMounts:
+            - name: shared-keys
+              mountPath: /shared_keys
+      volumes:
+        - name: shared-keys
+          persistentVolumeClaim:
+            claimName: shared-keys-pvc
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service-kafka-consumer
+  namespace: microservices
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service-kafka-consumer
+  template:
+    metadata:
+      labels:
+        app: notification-service-kafka-consumer
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: consumer
+          image: micro_service-notification_service_kafka_consumer:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: SERVICE_TYPE
+              value: "kafka_consumer"
+            - name: POSTGRES_HOST
+              value: "notification-db"
+            - name: POSTGRES_DB
+              value: "notification_db"
+            - name: POSTGRES_USER
+              value: "notification_user"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: NOTIFICATION_POSTGRES_PASSWORD
+          volumeMounts:
+            - name: shared-keys
+              mountPath: /shared_keys
+      volumes:
+        - name: shared-keys
+          persistentVolumeClaim:
+            claimName: shared-keys-pvc
+

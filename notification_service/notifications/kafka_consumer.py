@@ -39,6 +39,18 @@ def process_notification_message(message_data):
         message = payload.get('message', '')
         notification_type = payload.get('notification_type') or 'SYSTEM'
         metadata = payload.get('metadata', {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        # Merge payload attributes into metadata for client-side tracking matching
+        merged_meta = dict(metadata)
+        for field in ['shipment_id', 'order_id', 'customer_id', 'tracking_code', 'carrier', 'status', 'new_status', 'old_status', 'notes', 'payment_id', 'amount']:
+            if field in payload and payload[field] is not None:
+                merged_meta[field] = payload[field]
+        if 'status' not in merged_meta and 'new_status' in merged_meta:
+            merged_meta['status'] = merged_meta['new_status']
+        metadata = merged_meta
+
         tenant_id = payload.get('tenant_id')
         is_broadcast = payload.get('broadcast', False)
 

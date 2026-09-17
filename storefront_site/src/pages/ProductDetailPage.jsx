@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext';
 import { Modal, StarRating } from '../components/common/UIComponents';
 import { BuyBox } from '../components/BuyBox';
 import { ProductCarousel } from '../components/ProductCarousel';
+import { CountdownTimer } from '../components/CountdownTimer';
 import { ArrowLeft, MessageSquare, Plus, Heart } from 'lucide-react';
 
 export const ProductDetailPage = () => {
@@ -200,8 +201,42 @@ export const ProductDetailPage = () => {
   );
   if (!product) return <div className="p-16 text-center text-amazon-text-secondary min-h-screen bg-white">Product not found.</div>;
 
-  const basePrice = Number(product.dynamic_price || product.base_price || product.price || 0);
-  const displayPrice = selectedVariant ? Number(selectedVariant.price || selectedVariant.effective_price || basePrice) : basePrice;
+  const originalBasePrice = Number(product.base_price || product.price || product.price_detail?.base_price || 0);
+  const activeDiscount = product.active_discount || product.discounts?.[0] || product.price_detail?.active_discount;
+  
+  let dynamicFinalPrice = product.dynamic_price ? Number(product.dynamic_price) : originalBasePrice;
+  let hasDiscount = false;
+  let discountBadgeLabel = '';
+  let discountSavingsAmount = 0;
+
+  if (activeDiscount) {
+    hasDiscount = true;
+    const discountVal = parseFloat(activeDiscount.discount_value || 0);
+    if (activeDiscount.discount_type === 'PERCENTAGE') {
+      const pct = Math.round(discountVal);
+      discountBadgeLabel = `-${pct}% OFF`;
+      if (!product.dynamic_price) {
+        dynamicFinalPrice = Math.max(0, originalBasePrice * (1 - pct / 100));
+      }
+      discountSavingsAmount = Math.max(0, originalBasePrice - dynamicFinalPrice);
+    } else if (activeDiscount.discount_type === 'FIXED' || activeDiscount.discount_type === 'FIXED_AMOUNT') {
+      discountSavingsAmount = discountVal;
+      const pct = originalBasePrice > 0 ? Math.round((discountVal / originalBasePrice) * 100) : 0;
+      discountBadgeLabel = `Save $${discountVal.toFixed(2)}${pct > 0 ? ` (${pct}% OFF)` : ''}`;
+      if (!product.dynamic_price) {
+        dynamicFinalPrice = Math.max(0, originalBasePrice - discountVal);
+      }
+    } else {
+      discountSavingsAmount = Math.max(0, originalBasePrice - dynamicFinalPrice);
+    }
+  } else if (originalBasePrice > dynamicFinalPrice) {
+    hasDiscount = true;
+    discountSavingsAmount = originalBasePrice - dynamicFinalPrice;
+    const pct = Math.round((discountSavingsAmount / originalBasePrice) * 100);
+    discountBadgeLabel = `-${pct}% OFF`;
+  }
+
+  const displayPrice = selectedVariant ? Number(selectedVariant.price || selectedVariant.effective_price || dynamicFinalPrice) : dynamicFinalPrice;
 
   return (
     <div className="w-full bg-white min-h-screen pb-16">
@@ -310,14 +345,41 @@ export const ProductDetailPage = () => {
             </div>
 
             {/* Price block */}
-            <div className="py-2">
-              <div className="flex items-start text-3xl text-amazon-text-primary">
-                <span className="text-sm font-medium mt-1">$</span>
-                <span className="font-semibold">{Math.floor(displayPrice)}</span>
-                <span className="text-sm font-medium mt-1">{(Number(displayPrice) % 1).toFixed(2).substring(2)}</span>
+            <div className="py-3 px-4 rounded-lg bg-[#F7F7F7] border border-[#D5D9D9] space-y-2">
+              {activeDiscount?.end_time && (
+                <div className="mb-1">
+                  <CountdownTimer endTime={activeDiscount.end_time} className="text-sm px-3 py-1 font-bold shadow-sm" />
+                </div>
+              )}
+
+              <div className="flex items-baseline gap-3 flex-wrap">
+                {hasDiscount && (
+                  <span className="bg-[#CC0C39] text-white text-xs font-extrabold px-2.5 py-1 rounded">
+                    {discountBadgeLabel}
+                  </span>
+                )}
+                <div className="flex items-start text-3xl font-extrabold text-[#CC0C39]">
+                  <span className="text-sm font-medium mt-1">$</span>
+                  <span>{Math.floor(displayPrice)}</span>
+                  <span className="text-sm font-medium mt-1">{(Number(displayPrice) % 1).toFixed(2).substring(2)}</span>
+                </div>
               </div>
-              <div className="text-sm text-amazon-text-secondary mt-1">
-                <span>FREE Returns</span>
+
+              {hasDiscount && originalBasePrice > displayPrice && (
+                <div className="text-sm text-amazon-text-secondary space-y-0.5">
+                  <div>
+                    List / Base Price: <span className="line-through font-semibold text-slate-500">${originalBasePrice.toFixed(2)}</span>
+                  </div>
+                  {discountSavingsAmount > 0 && (
+                    <div className="text-xs text-[#CC0C39] font-bold">
+                      You save: ${discountSavingsAmount.toFixed(2)} ({Math.round((discountSavingsAmount / originalBasePrice) * 100)}%)
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="text-xs text-amazon-text-secondary pt-1 border-t border-slate-200">
+                <span>FREE Returns & Fast Delivery</span>
               </div>
             </div>
 
@@ -327,7 +389,7 @@ export const ProductDetailPage = () => {
                 <div className="text-sm flex items-center gap-2">
                   <span className="text-amazon-text-secondary">Option:</span>{' '}
                   <span className="font-bold">{selectedVariant ? getVariantLabel(selectedVariant) : ''}</span>
-                  {selectedVariant && Number(selectedVariant.price) !== basePrice && (
+                  {selectedVariant && Number(selectedVariant.price) !== originalBasePrice && (
                     <span className="text-xs text-[#565959] ml-1">
                       — ${Number(selectedVariant.price).toLocaleString()}
                     </span>
@@ -362,7 +424,7 @@ export const ProductDetailPage = () => {
                         )}
                         <div className="flex flex-col items-start px-1">
                           <span className="text-xs font-medium">{label}</span>
-                          {vPrice > 0 && vPrice !== basePrice && (
+                          {vPrice > 0 && vPrice !== originalBasePrice && (
                             <span className="text-[10px] text-[#565959]">${vPrice.toLocaleString()}</span>
                           )}
                           {v.stock === 0 && <span className="text-[9px] text-red-500">Out of stock</span>}
@@ -396,7 +458,16 @@ export const ProductDetailPage = () => {
           {/* RIGHT: Buy Box (3 columns wide) */}
           <div className="lg:col-span-3">
              <BuyBox 
-               product={{...product, price: displayPrice, stock: selectedVariant ? selectedVariant.stock : product.stock}}
+               product={{
+                 ...product,
+                 price: displayPrice,
+                 base_price: originalBasePrice,
+                 has_discount: hasDiscount,
+                 discount_badge: discountBadgeLabel,
+                 discount_savings: discountSavingsAmount,
+                 active_discount: activeDiscount,
+                 stock: selectedVariant ? selectedVariant.stock : product.stock
+               }}
                quantity={quantity}
                setQuantity={setQuantity}
                onAddToCart={handleAddToCart}

@@ -7,7 +7,7 @@ python manage.py migrate --noinput
 
 if [ "$SERVICE_TYPE" = "celery_worker" ]; then
     echo "[Recommendation Service] Starting Celery Worker..."
-    exec celery -A recommendation_project worker -l info
+    exec celery -A recommendation_project worker -l info --concurrency=2
 elif [ "$SERVICE_TYPE" = "celery_beat" ]; then
     echo "[Recommendation Service] Starting Celery Beat..."
     exec celery -A recommendation_project beat -l info

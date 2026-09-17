@@ -1,0 +1,19 @@
+{
+  "urls": [
+    { "name": "1. Identity & Auth Service (OpenAPI 3.0)", "url": "/api/auth/schema/" },
+    { "name": "2. Catalog Service (OpenAPI 3.0)", "url": "/api/catalog/schema/" },
+    { "name": "3. Cart Service (OpenAPI 3.0)", "url": "/api/cart/schema/" },
+    { "name": "4. Order Service (OpenAPI 3.0)", "url": "/api/orders/schema/" },
+    { "name": "5. Payment Service (OpenAPI 3.0)", "url": "/api/payments/schema/" },
+    { "name": "6. Inventory Service (OpenAPI 3.0)", "url": "/api/inventory/schema/" },
+    { "name": "7. Finance Service (OpenAPI 3.0)", "url": "/api/finance/schema/" },
+    { "name": "8. Media Service (OpenAPI 3.0)", "url": "/api/media/schema/" },
+    { "name": "9. Chat Service (OpenAPI 3.0)", "url": "/api/chat/schema/" },
+    { "name": "10. Recommendation Service (OpenAPI 3.0)", "url": "/api/recommendations/schema/" },
+    { "name": "11. Notification Service (OpenAPI 3.0)", "url": "/api/notifications/schema/" },
+    { "name": "12. Merged OpenAPI 3.0 Ecosystem", "url": "/docs/openapi.json" }
+  ],
+  "deepLinking": true,
+  "displayRequestDuration": true,
+  "persistAuthorization": true
+}

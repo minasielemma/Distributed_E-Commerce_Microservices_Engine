@@ -53,13 +53,19 @@ class NotificationViewSet(viewsets.ModelViewSet):
         if not user:
             return Response({'detail': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
         
-        try:
-            notification = Notification.objects.get(id=pk, user_id=str(user.id))
-            notification.is_read = True
-            notification.save()
-            return Response({'status': 'notification marked as read'}, status=status.HTTP_200_OK)
-        except Notification.DoesNotExist:
+        qs = self.get_queryset()
+        notification = qs.filter(id=pk).first()
+        if not notification:
+            role = str(getattr(user, 'role', '')).upper()
+            if role in ['ADMIN', 'SUPERADMIN', 'PLATFORM_ADMIN', 'STORE_OWNER', 'VENDOR', 'DEALER']:
+                notification = Notification.objects.filter(id=pk).first()
+
+        if not notification:
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        notification.is_read = True
+        notification.save()
+        return Response({'status': 'notification marked as read'}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='read')
     def mark_as_read_legacy(self, request, pk=None):
@@ -72,7 +78,8 @@ class NotificationViewSet(viewsets.ModelViewSet):
         if not user:
             return Response({'detail': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
         
-        Notification.objects.filter(user_id=str(user.id), is_read=False).update(is_read=True)
+        qs = self.get_queryset().filter(is_read=False)
+        qs.update(is_read=True)
         return Response({'status': 'all notifications marked as read'}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='unread_count')
@@ -81,7 +88,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
         if not user:
             return Response({'unread_count': 0}, status=status.HTTP_200_OK)
         
-        count = Notification.objects.filter(user_id=str(user.id), is_read=False).count()
+        count = self.get_queryset().filter(is_read=False).count()
         return Response({'unread_count': count}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], url_path='create-internal')

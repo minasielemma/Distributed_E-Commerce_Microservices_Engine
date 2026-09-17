@@ -1,18 +1,45 @@
 import React from 'react';
 import { Lock, MapPin } from 'lucide-react';
 import { Badge } from './common/UIComponents';
+import { CountdownTimer } from './CountdownTimer';
 
 export const BuyBox = ({ product, quantity, setQuantity, onAddToCart, onBuyNow, onAddToWishlist, isAdding, isAddingWishlist }) => {
   const price = parseFloat(product.price);
+  const basePrice = parseFloat(product.base_price || product.price);
+  const hasDiscount = Boolean(product.has_discount || (basePrice > price));
+  const activeDiscount = product.active_discount || product.discounts?.[0];
   const stock = product.stock || 0;
   
   return (
     <div className="border border-[#D5D9D9] rounded-lg p-4 bg-white shadow-sm flex flex-col">
-      <div className="text-2xl font-normal mb-2">
+      {activeDiscount?.end_time && (
+        <div className="mb-2">
+          <CountdownTimer endTime={activeDiscount.end_time} className="w-full text-xs py-1 justify-center" />
+        </div>
+      )}
+
+      {hasDiscount && product.discount_badge && (
+        <div className="mb-1">
+          <span className="bg-[#CC0C39] text-white text-xs font-bold px-2 py-0.5 rounded inline-block">
+            {product.discount_badge}
+          </span>
+        </div>
+      )}
+
+      <div className="text-2xl font-bold mb-1 text-[#0F1111]">
         <span className="text-sm align-top">$</span>
         {Math.floor(price)}
         <span className="text-sm align-top">{(price % 1).toFixed(2).substring(2)}</span>
       </div>
+
+      {hasDiscount && basePrice > price && (
+        <div className="text-xs text-amazon-text-secondary mb-2">
+          List: <span className="line-through font-semibold text-slate-500">${basePrice.toFixed(2)}</span>
+          {product.discount_savings > 0 && (
+            <span className="text-[#CC0C39] font-bold ml-1.5">(Save ${product.discount_savings.toFixed(2)})</span>
+          )}
+        </div>
+      )}
       
       <div className="text-sm text-amazon-text-secondary mb-3">
         <span>FREE Returns</span>
@@ -102,3 +129,4 @@ export const BuyBox = ({ product, quantity, setQuantity, onAddToCart, onBuyNow, 
     </div>
   );
 };
+

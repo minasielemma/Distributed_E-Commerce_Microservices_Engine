@@ -40,7 +40,8 @@ def log_audit_event(request, action, resource_type="", resource_id="", status="S
                 clean_details[secret_key] = '***REDACTED***'
 
         creds = _get_channel_credentials()
-        options = [('grpc.ssl_target_name_override', 'catalog_service')] if creds else None
+        target_name = IDENTITY_GRPC_HOST.split(':')[0]
+        options = [('grpc.ssl_target_name_override', target_name)] if creds else None
         channel = grpc.secure_channel(IDENTITY_GRPC_HOST, creds, options=options) if creds else grpc.insecure_channel(IDENTITY_GRPC_HOST)
         stub = IdentityServiceStub(channel)
         stub.CreateAuditLog(AuditLogRequest(

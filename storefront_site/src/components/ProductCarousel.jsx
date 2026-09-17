@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { CountdownTimer } from './CountdownTimer';
 
 export const ProductCarousel = ({ title, products, isLoading, seeMoreLink }) => {
   const scrollRef = useRef(null);
@@ -52,32 +53,73 @@ export const ProductCarousel = ({ title, products, isLoading, seeMoreLink }) => 
           className="flex gap-4 overflow-x-auto scrollbar-hide py-2 snap-x"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-          {products.map(product => (
-            <Link 
-              key={product.id} 
-              to={`/products/${product.id}`}
-              className="min-w-[200px] max-w-[200px] flex-shrink-0 flex flex-col snap-start hover:opacity-80 transition-opacity"
-            >
-              <div className="h-[200px] w-full bg-[#F7F7F7] p-2 flex items-center justify-center mb-2">
-                <img 
-                  src={product.image_url || 'https://via.placeholder.com/200'} 
-                  alt={product.name}
-                  className="max-h-full max-w-full object-contain mix-blend-multiply"
-                />
-              </div>
-              {product.discount_percent > 0 && (
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="bg-[#CC0C39] text-white text-xs font-bold px-2 py-1 rounded-sm">
-                    {product.discount_percent}% off
-                  </span>
-                  <span className="text-[#CC0C39] text-xs font-bold tracking-tight">Deal</span>
+          {products.map(product => {
+            const baseP = parseFloat(product.base_price || product.price || 0);
+            const activeDisc = product.active_discount || product.discounts?.[0] || product.price_detail?.active_discount;
+            let dynP = product.dynamic_price ? parseFloat(product.dynamic_price) : baseP;
+            let hasDiscount = false;
+            let discountLabel = '';
+
+            if (activeDisc) {
+              hasDiscount = true;
+              const val = parseFloat(activeDisc.discount_value || 0);
+              if (activeDisc.discount_type === 'PERCENTAGE') {
+                const pct = Math.round(val);
+                discountLabel = `-${pct}% OFF`;
+                if (!product.dynamic_price) dynP = baseP * (1 - pct / 100);
+              } else if (activeDisc.discount_type === 'FIXED' || activeDisc.discount_type === 'FIXED_AMOUNT') {
+                discountLabel = `Save $${val.toFixed(2)}`;
+                if (!product.dynamic_price) dynP = Math.max(0, baseP - val);
+              }
+            } else if (dynP < baseP) {
+              hasDiscount = true;
+              const pct = Math.round(((baseP - dynP) / baseP) * 100);
+              discountLabel = `-${pct}% OFF`;
+            } else if (product.discount_percent > 0) {
+              hasDiscount = true;
+              discountLabel = `-${product.discount_percent}% OFF`;
+            }
+
+            const imgUrl = product.image_url || product.images?.[0]?.image_url || 'https://via.placeholder.com/200?text=No+Image';
+
+            return (
+              <Link 
+                key={product.id} 
+                to={`/products/${product.id}`}
+                className="min-w-[200px] max-w-[200px] flex-shrink-0 flex flex-col snap-start hover:opacity-90 transition-opacity group/card"
+              >
+                <div className="h-[180px] w-full bg-[#F7F7F7] p-2 flex items-center justify-center mb-2 relative rounded overflow-hidden">
+                  <img 
+                    src={imgUrl} 
+                    alt={product.name}
+                    className="max-h-full max-w-full object-contain mix-blend-multiply group-hover/card:scale-105 transition-transform"
+                  />
+                  {hasDiscount && (
+                    <span className="absolute top-2 left-2 bg-[#CC0C39] text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
+                      {discountLabel}
+                    </span>
+                  )}
                 </div>
-              )}
-              <span className="text-sm text-amazon-link-teal line-clamp-2 leading-snug">
-                {product.name}
-              </span>
-            </Link>
-          ))}
+
+                {activeDisc?.end_time && (
+                  <div className="mb-1">
+                    <CountdownTimer endTime={activeDisc.end_time} className="text-[10px] py-0 px-1" />
+                  </div>
+                )}
+
+                <span className="text-sm font-medium text-amazon-text-primary group-hover/card:text-amazon-orange line-clamp-2 leading-snug mb-1">
+                  {product.name}
+                </span>
+
+                <div className="flex items-baseline gap-2 mt-auto">
+                  <span className="text-base font-bold text-[#0F1111]">${dynP.toFixed(2)}</span>
+                  {hasDiscount && baseP > dynP && (
+                    <span className="text-xs text-amazon-text-secondary line-through">${baseP.toFixed(2)}</span>
+                  )}
+                </div>
+              </Link>
+            );
+          })}
         </div>
 
         <button 
@@ -90,3 +132,4 @@ export const ProductCarousel = ({ title, products, isLoading, seeMoreLink }) => 
     </div>
   );
 };
+

@@ -5,8 +5,8 @@ from catalog.inventory_pb2_grpc import InventoryServiceStub
 from catalog.identity_pb2 import AuditLogRequest
 from catalog.identity_pb2_grpc import IdentityServiceStub
 
-INVENTORY_GRPC_HOST = os.getenv('INVENTORY_GRPC_HOST', 'inventory_service:50052')
-IDENTITY_GRPC_HOST = os.getenv('IDENTITY_GRPC_HOST', 'identity_service:50053')
+INVENTORY_GRPC_HOST = os.getenv('INVENTORY_GRPC_HOST', 'inventory-service:50052')
+IDENTITY_GRPC_HOST = os.getenv('IDENTITY_GRPC_HOST', 'identity-service:50053')
 KEYS_DIR = os.getenv('KEYS_DIR', '/shared_keys')
 
 
@@ -30,7 +30,8 @@ def _get_channel_credentials():
 def _get_channel(host):
     creds = _get_channel_credentials()
     if creds:
-        options = [('grpc.ssl_target_name_override', 'catalog_service')]
+        target_name = host.split(':')[0].replace('-', '_')
+        options = [('grpc.ssl_target_name_override', target_name)]
         return grpc.secure_channel(host, creds, options=options)
     return grpc.insecure_channel(host)
 

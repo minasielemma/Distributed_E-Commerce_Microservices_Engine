@@ -39,9 +39,21 @@ class RecommendedCategoriesView(APIView):
         categories = get_recommended_categories(user_id=user_id, limit=limit)
         return Response({'results': categories}, status=status.HTTP_200_OK)
 
+import requests
+
+def _fetch_catalog_product_http(pid):
+    try:
+        url = f"http://catalog-service:8000/api/catalog/products/{pid}/"
+        resp = requests.get(url, timeout=3)
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as err:
+        logger.warning(f"HTTP fallback fetch for product {pid} failed: {err}")
+    return None
+
 def enrich_recommendations_with_catalog(recs, tenant_id=None):
     """
-    Enriches recommendation items with full product details from catalog_service or ProductMetadataCache via gRPC.
+    Enriches recommendation items with full product details including image URLs from catalog_service.
     """
     if not recs:
         return []
@@ -52,25 +64,43 @@ def enrich_recommendations_with_catalog(recs, tenant_id=None):
 
     catalog_map = {}
 
-    # Fetch from catalog_service via gRPC
+    # Fetch from catalog_service via HTTP REST or gRPC
     for pid in product_ids[:20]:
-        try:
-            prod_pb = get_catalog_product_grpc(pid)
-            if prod_pb and getattr(prod_pb, 'found', False) and prod_pb.id:
-                title = getattr(prod_pb, 'title', '') or getattr(prod_pb, 'name', '')
-                price = float(getattr(prod_pb, 'price', 0.0))
-                catalog_map[str(pid)] = {
-                    'id': str(prod_pb.id),
-                    'name': title,
-                    'price': price,
-                    'base_price': price,
-                    'category_name': getattr(prod_pb, 'category_name', ''),
-                    'rating_avg': getattr(prod_pb, 'rating_avg', 0.0),
-                    'images': []
-                }
-        except Exception as e:
-            logger.warning(f"Failed to fetch catalog product details via gRPC for {pid}: {e}")
-
+        prod_data = _fetch_catalog_product_http(pid)
+        if prod_data:
+            name = prod_data.get('name') or prod_data.get('title') or f"Product {str(pid)[:8]}"
+            price = float(prod_data.get('dynamic_price') or prod_data.get('base_price') or prod_data.get('price') or 0.0)
+            img_url = prod_data.get('image_url') or (prod_data.get('images', [{}])[0].get('image_url') if prod_data.get('images') else '') or ''
+            images = prod_data.get('images') or ([{'image_url': img_url}] if img_url else [])
+            catalog_map[str(pid)] = {
+                'id': str(pid),
+                'name': name,
+                'price': price,
+                'base_price': price,
+                'category_name': prod_data.get('category_name', ''),
+                'rating_avg': float(prod_data.get('average_rating') or prod_data.get('rating_avg') or 0.0),
+                'image_url': img_url,
+                'images': images
+            }
+        else:
+            try:
+                prod_pb = get_catalog_product_grpc(pid)
+                if prod_pb and getattr(prod_pb, 'found', False) and prod_pb.id:
+                    title = getattr(prod_pb, 'title', '') or getattr(prod_pb, 'name', '')
+                    price = float(getattr(prod_pb, 'price', 0.0))
+                    img_url = getattr(prod_pb, 'image_url', '') or ''
+                    catalog_map[str(pid)] = {
+                        'id': str(prod_pb.id),
+                        'name': title,
+                        'price': price,
+                        'base_price': price,
+                        'category_name': getattr(prod_pb, 'category_name', ''),
+                        'rating_avg': getattr(prod_pb, 'rating_avg', 0.0),
+                        'image_url': img_url,
+                        'images': [{'image_url': img_url}] if img_url else []
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to fetch catalog product details via gRPC for {pid}: {e}")
 
     # For any missing products, fallback to ProductMetadataCache
     missing_ids = [pid for pid in product_ids if str(pid) not in catalog_map]
@@ -84,10 +114,12 @@ def enrich_recommendations_with_catalog(recs, tenant_id=None):
                 'base_price': float(meta.price),
                 'category_name': meta.category_name,
                 'rating_avg': meta.rating_avg,
-                'images': []
+                'image_url': getattr(meta, 'image_url', ''),
+                'images': [{'image_url': getattr(meta, 'image_url', '')}] if getattr(meta, 'image_url', '') else []
             }
 
     enriched = []
+    default_fallback_img = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80'
     for rec in recs:
         pid_str = str(rec['product_id'])
         prod = catalog_map.get(pid_str)
@@ -95,14 +127,20 @@ def enrich_recommendations_with_catalog(recs, tenant_id=None):
             item = dict(prod)
             item['recommendation_score'] = rec.get('score', 1.0)
             item['recommendation_reason'] = rec.get('reason', '')
+            if not item.get('image_url') and item.get('images'):
+                item['image_url'] = item['images'][0].get('image_url')
+            if not item.get('image_url'):
+                item['image_url'] = default_fallback_img
+                item['images'] = [{'image_url': default_fallback_img}]
             enriched.append(item)
         else:
-            # Fallback stub object if product not in catalog or cache
             enriched.append({
                 'id': pid_str,
                 'name': f"Product {pid_str[:8]}",
                 'price': 0.0,
                 'base_price': 0.0,
+                'image_url': default_fallback_img,
+                'images': [{'image_url': default_fallback_img}],
                 'recommendation_score': rec.get('score', 1.0),
                 'recommendation_reason': rec.get('reason', '')
             })

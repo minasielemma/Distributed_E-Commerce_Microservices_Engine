@@ -38,19 +38,31 @@ def send_notification_to_identity(user_id, tenant_id, title, message, notif_type
 
 
 def ensure_room_participants(room, auth_header=None):
-    """Ensure room has store owner or platform admins if missing."""
+    """Ensure room has store owner, order customer, or platform admins if missing."""
     if not room:
         return
     try:
+        existing_participants = set(str(uid) for uid in RoomParticipant.objects.filter(room=room).values_list('user_id', flat=True))
         existing_roles = set(RoomParticipant.objects.filter(room=room).values_list('user_role', flat=True))
+        
         needs_owner = (room.tenant_id or room.order_id or room.room_type == 'ORDER_SUPPORT') and not (
             'STORE_OWNER' in existing_roles or 'SHOP_OWNER' in existing_roles or 'TENANT_ADMIN' in existing_roles
         )
         needs_admin = (room.room_type in ['SUPPORT', 'CUSTOMER_SUPPORT'] or 'support' in str(room.name).lower()) and not (
             'PLATFORM_ADMIN' in existing_roles or 'ADMIN' in existing_roles
         )
+        needs_customer = False
+        if room.order_id:
+            try:
+                from chat.grpc_client import get_order_grpc
+                o_res = get_order_grpc(room.order_id)
+                if o_res and o_res.found and o_res.customer_id:
+                    if str(o_res.customer_id) not in existing_participants:
+                        needs_customer = True
+            except Exception:
+                pass
 
-        if needs_owner or needs_admin:
+        if needs_owner or needs_admin or needs_customer:
             auto_add_participants(
                 room=room,
                 creator_user_id=room.created_by,
@@ -190,13 +202,13 @@ def auto_add_participants(room, creator_user_id, tenant_id=None, order_id=None, 
     """
     Automatically add appropriate participants based on room type and context:
     - SUPPORT / CUSTOMER_SUPPORT: Auto-add Platform Admins from identity_service.
-    - ORDER_SUPPORT or order_id / tenant_id present: Auto-add Store Owner / Tenant Owner from identity_service.
+    - ORDER_SUPPORT or order_id present: Auto-add Order Customer and Store Owner / Tenant Owner.
+    - Shop / tenant_id present: Auto-add Selected Store Owner / Tenant Owner from identity_service.
     """
     added_names = []
     headers = {'X-Service-Token': 'internal'}
     if auth_header:
         headers['Authorization'] = auth_header
-
 
     # 1. Handle Support Chat Rooms (Auto-add Platform Admins)
     is_support = (room_type in ['SUPPORT', 'CUSTOMER_SUPPORT'] or 'support' in str(room.name).lower())
@@ -221,24 +233,61 @@ def auto_add_participants(room, creator_user_id, tenant_id=None, order_id=None, 
         except Exception as e:
             logger.warning(f"Failed to auto-add admins to support room {room.id}: {e}")
 
-    # 2. Handle Shop & Order-Related Chat Rooms (Auto-add Store Owner)
+    # 2. Resolve Order Details (Tenant ID & Customer ID)
     target_tenant_id = tenant_id or getattr(room, 'tenant_id', None)
-    if not target_tenant_id and order_id:
+    target_customer_id = None
+    target_order_id = order_id or getattr(room, 'order_id', None)
+
+    if target_order_id:
         try:
             from chat.grpc_client import get_order_grpc
-            o_res = get_order_grpc(order_id)
+            o_res = get_order_grpc(target_order_id)
             if o_res and o_res.found:
-                target_tenant_id = o_res.tenant_id
-                if target_tenant_id and not room.tenant_id:
-                    room.tenant_id = target_tenant_id
-                    room.save(update_fields=['tenant_id'])
+                if o_res.tenant_id:
+                    target_tenant_id = o_res.tenant_id
+                    if not room.tenant_id:
+                        room.tenant_id = target_tenant_id
+                        room.save(update_fields=['tenant_id'])
+                if o_res.customer_id:
+                    target_customer_id = o_res.customer_id
         except Exception as e:
-            logger.warning(f"Failed to resolve order {order_id} tenant_id: {e}")
+            logger.warning(f"Failed to resolve order {target_order_id} details: {e}")
 
+    # 3. Add Order Customer if missing
+    if target_customer_id and str(target_customer_id) != str(creator_user_id):
+        try:
+            cust_name = f'Customer-{str(target_customer_id)[:6]}'
+            cust_role = 'CUSTOMER'
+            try:
+                from chat.grpc_client import lookup_users_grpc
+                u_data = lookup_users_grpc(user_id=target_customer_id)
+                if u_data:
+                    cust_name = u_data[0].email or cust_name
+                    cust_role = getattr(u_data[0], 'role', '') or cust_role
+            except Exception:
+                pass
+
+            p, created = RoomParticipant.objects.get_or_create(
+                room=room,
+                user_id=target_customer_id,
+                defaults={
+                    'user_name': cust_name,
+                    'user_role': cust_role,
+                    'role': 'MEMBER'
+                }
+            )
+            if created:
+                added_names.append(cust_name)
+        except Exception as e:
+            logger.warning(f"Failed to auto-add customer {target_customer_id} for order room {room.id}: {e}")
+
+    # 4. Handle Shop / Tenant Chat Rooms (Auto-add Selected Store Owner)
     if target_tenant_id:
         try:
             from chat.grpc_client import lookup_users_grpc
             owners = lookup_users_grpc(tenant_id=target_tenant_id)
+            if not owners:
+                owners = list(lookup_users_grpc(role="STORE_OWNER")) + list(lookup_users_grpc(role="SHOP_OWNER"))
             for own in owners:
                 own_id = own.id
                 if own_id and str(own_id) != str(creator_user_id):

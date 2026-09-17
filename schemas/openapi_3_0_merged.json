@@ -1,0 +1,221 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Unified Microservices OpenAPI 3.0 Ecosystem",
+    "description": "Aggregated OpenAPI 3.0 specification for all 11 backend microservices.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "API Gateway Proxy"
+    }
+  ],
+  "paths": {
+    "/api/auth/": {
+      "get": {
+        "summary": "List Identity & Auth Service items",
+        "tags": [
+          "Identity & Auth Service"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/catalog/": {
+      "get": {
+        "summary": "List Catalog Service items",
+        "tags": [
+          "Catalog Service"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/cart/": {
+      "get": {
+        "summary": "List Cart Service items",
+        "tags": [
+          "Cart Service"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/orders/": {
+      "get": {
+        "summary": "List Order Service items",
+        "tags": [
+          "Order Service"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/payments/": {
+      "get": {
+        "summary": "List Payment Service items",
+        "tags": [
+          "Payment Service"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/inventory/": {
+      "get": {
+        "summary": "List Inventory Service items",
+        "tags": [
+          "Inventory Service"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/finance/": {
+      "get": {
+        "summary": "List Finance Service items",
+        "tags": [
+          "Finance Service"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/media/": {
+      "get": {
+        "summary": "List Media Service items",
+        "tags": [
+          "Media Service"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/chat/": {
+      "get": {
+        "summary": "List Chat Service items",
+        "tags": [
+          "Chat Service"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/recommendations/": {
+      "get": {
+        "summary": "List Recommendation Service items",
+        "tags": [
+          "Recommendation Service"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/notifications/": {
+      "get": {
+        "summary": "List Notification Service items",
+        "tags": [
+          "Notification Service"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {},
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Enter JWT Bearer token format: Bearer <token>"
+      }
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Identity & Auth Service",
+      "description": "Endpoints for Identity & Auth Service"
+    },
+    {
+      "name": "Catalog Service",
+      "description": "Endpoints for Catalog Service"
+    },
+    {
+      "name": "Cart Service",
+      "description": "Endpoints for Cart Service"
+    },
+    {
+      "name": "Order Service",
+      "description": "Endpoints for Order Service"
+    },
+    {
+      "name": "Payment Service",
+      "description": "Endpoints for Payment Service"
+    },
+    {
+      "name": "Inventory Service",
+      "description": "Endpoints for Inventory Service"
+    },
+    {
+      "name": "Finance Service",
+      "description": "Endpoints for Finance Service"
+    },
+    {
+      "name": "Media Service",
+      "description": "Endpoints for Media Service"
+    },
+    {
+      "name": "Chat Service",
+      "description": "Endpoints for Chat Service"
+    },
+    {
+      "name": "Recommendation Service",
+      "description": "Endpoints for Recommendation Service"
+    },
+    {
+      "name": "Notification Service",
+      "description": "Endpoints for Notification Service"
+    }
+  ]
+}

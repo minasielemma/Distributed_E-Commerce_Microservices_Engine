@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { catalogService } from '../services/apiServices';
 import { getErrorMessage } from '../services/api';
+import { CountdownTimer } from './CountdownTimer';
 
 export const ProductCard = ({ product, onAddToCart, onToggleWishlist, isWishlisted = false }) => {
   const { showSuccess, showError } = useToast();
@@ -12,23 +13,34 @@ export const ProductCard = ({ product, onAddToCart, onToggleWishlist, isWishlist
   const [liked, setLiked] = useState(product.is_liked || false);
   const [likesCount, setLikesCount] = useState(product.likes_count || 0);
 
-  const basePrice = parseFloat(product.base_price || product.price_detail?.base_price || 0);
+  const basePrice = parseFloat(product.base_price || product.price || product.price_detail?.base_price || 0);
   
   // Calculate discount if available
   let finalPrice = basePrice;
   let hasDiscount = false;
   let discountPercent = 0;
+  let discountBadgeLabel = '';
 
-  const activeDiscount = product.discounts?.[0] || product.price_detail?.active_discount;
+  const activeDiscount = product.active_discount || product.discounts?.[0] || product.price_detail?.active_discount;
   if (activeDiscount) {
     hasDiscount = true;
+    const discountVal = parseFloat(activeDiscount.discount_value || 0);
     if (activeDiscount.discount_type === 'PERCENTAGE') {
-      discountPercent = Math.round(activeDiscount.discount_value);
-      finalPrice = basePrice * (1 - discountPercent / 100);
-    } else if (activeDiscount.discount_type === 'FIXED') {
-      finalPrice = Math.max(0, basePrice - parseFloat(activeDiscount.discount_value));
-      discountPercent = Math.round(((basePrice - finalPrice) / basePrice) * 100);
+      discountPercent = Math.round(discountVal);
+      discountBadgeLabel = `-${discountPercent}% OFF`;
+      finalPrice = product.dynamic_price ? parseFloat(product.dynamic_price) : basePrice * (1 - discountPercent / 100);
+    } else if (activeDiscount.discount_type === 'FIXED' || activeDiscount.discount_type === 'FIXED_AMOUNT') {
+      discountPercent = basePrice > 0 ? Math.round((discountVal / basePrice) * 100) : 0;
+      discountBadgeLabel = `Save $${discountVal.toFixed(2)}`;
+      finalPrice = product.dynamic_price ? parseFloat(product.dynamic_price) : Math.max(0, basePrice - discountVal);
+    } else {
+      finalPrice = product.dynamic_price ? parseFloat(product.dynamic_price) : basePrice;
     }
+  } else if (product.dynamic_price && parseFloat(product.dynamic_price) < basePrice) {
+    hasDiscount = true;
+    finalPrice = parseFloat(product.dynamic_price);
+    discountPercent = Math.round(((basePrice - finalPrice) / basePrice) * 100);
+    discountBadgeLabel = `-${discountPercent}% OFF`;
   }
 
   let stockQty = 0;
@@ -153,27 +165,34 @@ export const ProductCard = ({ product, onAddToCart, onToggleWishlist, isWishlist
 
         {/* Pricing & Add to Cart Action */}
         <div className="mt-auto">
+          {activeDiscount?.end_time && (
+            <div className="mb-2">
+              <CountdownTimer endTime={activeDiscount.end_time} />
+            </div>
+          )}
+
           {hasDiscount ? (
-            <div className="flex items-baseline gap-1 mb-1">
-              <span className="text-xl font-medium text-[#CC0C39]">-{discountPercent}%</span>
-              <div className="flex items-start">
-                <span className="text-xs align-top mt-1">$</span>
-                <span className="text-2xl font-normal">{Math.floor(finalPrice)}</span>
-                <span className="text-xs align-top mt-1">{(finalPrice % 1).toFixed(2).substring(2)}</span>
+            <div className="space-y-1 mb-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="bg-[#CC0C39] text-white text-xs font-bold px-1.5 py-0.5 rounded">
+                  {discountBadgeLabel}
+                </span>
+                <div className="flex items-start text-[#CC0C39]">
+                  <span className="text-xs align-top mt-1">$</span>
+                  <span className="text-2xl font-bold">{Math.floor(finalPrice)}</span>
+                  <span className="text-xs align-top mt-1">{(finalPrice % 1).toFixed(2).substring(2)}</span>
+                </div>
+              </div>
+              <div className="text-xs text-amazon-text-secondary">
+                Base price: <span className="line-through font-semibold text-slate-500">${basePrice.toFixed(2)}</span>
               </div>
             </div>
           ) : (
-             <div className="flex items-start mb-1">
+             <div className="flex items-start mb-2">
                 <span className="text-xs align-top mt-1">$</span>
                 <span className="text-2xl font-normal">{Math.floor(finalPrice)}</span>
                 <span className="text-xs align-top mt-1">{(finalPrice % 1).toFixed(2).substring(2)}</span>
             </div>
-          )}
-          
-          {hasDiscount && (
-             <div className="text-xs text-amazon-text-secondary mb-2">
-               List: <span className="line-through">${basePrice.toFixed(2)}</span>
-             </div>
           )}
 
           <div className="text-xs text-amazon-text-secondary mb-2">
@@ -204,3 +223,4 @@ export const ProductCard = ({ product, onAddToCart, onToggleWishlist, isWishlist
     </div>
   );
 };
+

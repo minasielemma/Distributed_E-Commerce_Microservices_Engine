@@ -4,6 +4,7 @@ import logging
 from decimal import Decimal
 from django.db import transaction
 from django.conf import settings
+from django.http import HttpResponseRedirect
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -43,49 +44,40 @@ class CreateCheckoutSessionView(APIView):
         discount_code = request.data.get('discount_code')
         discount_amount = request.data.get('discount_amount', '0.00')
         existing_payment = Payment.objects.filter(order_id=order_id, status='PENDING').first()
-        if existing_payment and existing_payment.polar_checkout_url and ('polar_chk_' not in existing_payment.polar_checkout_id) and ('https://polar.sh/checkout/polar_chk_' not in existing_payment.polar_checkout_url):
+        if existing_payment and existing_payment.polar_checkout_url:
             return Response({'message': 'Existing checkout session retrieved', 'payment': PaymentSerializer(existing_payment).data, 'checkout_url': existing_payment.polar_checkout_url}, status=status.HTTP_200_OK)
         catalog_product_id = request.data.get('product_id')
         polar_product_id = request.data.get('polar_product_id')
         product_name = request.data.get('product_name')
+
         provider = PolarPaymentProvider()
         session_info = provider.create_checkout_session(order_id, customer_id, amount, catalog_product_id=catalog_product_id, polar_product_id=polar_product_id, product_name=product_name)
-        if 'error' in session_info:
-            logger.info(f"Polar API unconfigured or error ({session_info['error']}). Processing local payment for order {order_id}...")
-            with transaction.atomic():
-                payment, created = Payment.objects.select_for_update().get_or_create(order_id=order_id, defaults={'tenant_id': tenant_id, 'customer_id': customer_id, 'amount': amount, 'discount_code': discount_code, 'discount_amount': discount_amount, 'provider': 'SIMULATED', 'status': 'PAID', 'polar_checkout_id': f'sim_chk_{uuid.uuid4().hex[:10]}'})
-                if not created and payment.status == 'PAID':
-                    return Response({'message': 'Payment already completed (idempotent)', 'payment': PaymentSerializer(payment).data, 'status': 'PAID'}, status=status.HTTP_200_OK)
-                payment.status = 'PAID'
-                payment.amount = amount
-                if discount_code:
-                    payment.discount_code = discount_code
-                    payment.discount_amount = discount_amount
-                if tenant_id and (not payment.tenant_id):
-                    payment.tenant_id = tenant_id
-                payment.save()
-                post_order_payment_journal_entry(payment)
-                if discount_code:
-                    try:
-                        from payments.grpc_client import confirm_coupon_grpc
-                        confirm_coupon_grpc(str(order_id))
-                    except Exception as coupon_err:
-                        logger.warning(f'Could not confirm coupon for order {order_id}: {coupon_err}')
-                try:
-                    from payments.grpc_client import mark_order_paid_grpc
-                    mark_order_paid_grpc(str(order_id))
-                except Exception as ord_err:
-                    logger.exception('Could not mark order %s as paid', order_id, exc_info=ord_err)
-                    raise Exception('Could not update order status') from ord_err
-                return Response({'message': 'Payment completed successfully (Local Payment)', 'payment': PaymentSerializer(payment).data, 'status': 'PAID'}, status=status.HTTP_200_OK)
+
+        checkout_base = get_polar_checkout_base_url()
+        checkout_url = session_info.get('checkout_url') or f"{checkout_base}/polar_chk_{uuid.uuid4().hex[:12]}"
+        checkout_id = session_info.get('checkout_id') or f"polar_chk_{uuid.uuid4().hex[:12]}"
+
         with transaction.atomic():
-            payment, created = Payment.objects.select_for_update().get_or_create(order_id=order_id, defaults={'tenant_id': tenant_id, 'customer_id': customer_id, 'amount': amount, 'discount_code': discount_code, 'discount_amount': discount_amount, 'provider': 'POLAR', 'status': 'PENDING', 'polar_checkout_id': session_info['checkout_id'], 'polar_checkout_url': session_info['checkout_url']})
+            payment, created = Payment.objects.select_for_update().get_or_create(
+                order_id=order_id,
+                defaults={
+                    'tenant_id': tenant_id,
+                    'customer_id': customer_id,
+                    'amount': amount,
+                    'discount_code': discount_code,
+                    'discount_amount': discount_amount,
+                    'provider': 'POLAR',
+                    'status': 'PENDING',
+                    'polar_checkout_id': checkout_id,
+                    'polar_checkout_url': checkout_url
+                }
+            )
             if not created:
-                payment.polar_checkout_id = session_info['checkout_id']
-                payment.polar_checkout_url = session_info['checkout_url']
+                payment.polar_checkout_id = checkout_id
+                payment.polar_checkout_url = checkout_url
                 payment.amount = amount
                 payment.save()
-        return Response({'message': 'Polar Checkout session created successfully', 'payment': PaymentSerializer(payment).data, 'checkout_url': session_info['checkout_url']}, status=status.HTTP_201_CREATED)
+        return Response({'message': 'Polar Checkout session created successfully', 'payment': PaymentSerializer(payment).data, 'checkout_url': checkout_url}, status=status.HTTP_201_CREATED)
 
 class ConfirmPaymentSessionView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -224,6 +216,8 @@ class PolarCheckoutView(APIView):
                             confirm_coupon_grpc(str(payment.order_id))
                         except Exception as coupon_err:
                             logger.warning(f'Could not confirm coupon for order {payment.order_id}: {coupon_err}')
+            if 'text/html' in request.headers.get('Accept', '') or not request.headers.get('X-Requested-With'):
+                return HttpResponseRedirect(f'/checkout/success?order_id={payment.order_id}')
             return Response({'message': 'Simulated Polar checkout completed successfully', 'status': 'PAID', 'payment': PaymentSerializer(payment).data, 'redirect_url': f'/checkout/success?order_id={payment.order_id}'}, status=status.HTTP_200_OK)
         except Exception as e:
             logger.error(f'Error handling simulated Polar checkout: {e}')
